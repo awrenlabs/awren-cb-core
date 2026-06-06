@@ -1,20 +1,36 @@
-version: "3.8"
-
 services:
   api:
     build:
-      context: ../../
+      context: ../..
       dockerfile: apps/api/Dockerfile
     ports:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://awren:awren@postgres:5432/awren
       - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=awren2026
       - QDRANT_URL=http://qdrant:6333
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
     depends_on:
-      - postgres
-      - neo4j
-      - qdrant
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - awren
 
   postgres:
     image: postgres:16-alpine
@@ -26,7 +42,16 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ../postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ../postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U awren"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - awren
 
   neo4j:
     image: neo4j:5-community
@@ -38,6 +63,16 @@ services:
       - "7687:7687"
     volumes:
       - neodata:/data
+      - ../neo4j/init.cypher:/docker-entrypoint-initdb.d/init.cypher:ro
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p awren2026 'RETURN 1' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - awren
 
   qdrant:
     image: qdrant/qdrant:v1.12
@@ -46,8 +81,21 @@ services:
       - "6334:6334"
     volumes:
       - qdrantdata:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - awren
 
 volumes:
   pgdata:
   neodata:
   qdrantdata:
+
+networks:
+  awren:
+    driver: bridge

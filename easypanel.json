@@ -1,0 +1,79 @@
+{
+  "name": "Awren Core",
+  "description": "Cognitive Operating System for Institutional Intelligence — ontology-driven, graph-native, event-sourced, multi-agent.",
+  "type": "stack",
+  "services": [
+    {
+      "name": "api",
+      "type": "web",
+      "build": {
+        "context": ".",
+        "dockerfile": "apps/api/Dockerfile"
+      },
+      "port": 8000,
+      "healthCheck": "/health",
+      "volumes": [
+        {
+          "name": "api-data",
+          "path": "/app/data"
+        }
+      ],
+      "environment": {
+        "DATABASE_URL": "postgresql://awren:awren@postgres:5432/awren",
+        "NEO4J_URI": "bolt://neo4j:7687",
+        "NEO4J_USER": "neo4j",
+        "NEO4J_PASSWORD": "awren2026",
+        "QDRANT_URL": "http://qdrant:6333",
+        "OPENAI_API_KEY": "",
+        "ANTHROPIC_API_KEY": "",
+        "LOG_LEVEL": "info",
+        "ENVIRONMENT": "production"
+      },
+      "dependsOn": ["postgres", "neo4j", "qdrant"]
+    },
+    {
+      "name": "postgres",
+      "type": "postgres",
+      "version": "16",
+      "environment": {
+        "POSTGRES_USER": "awren",
+        "POSTGRES_PASSWORD": "awren",
+        "POSTGRES_DB": "awren"
+      },
+      "volumes": [
+        {
+          "name": "pgdata",
+          "path": "/var/lib/postgresql/data"
+        }
+      ]
+    },
+    {
+      "name": "neo4j",
+      "type": "custom",
+      "image": "neo4j:5-community",
+      "port": 7474,
+      "environment": {
+        "NEO4J_AUTH": "neo4j/awren2026",
+        "NEO4J_PLUGINS": "[\"apoc\"]"
+      },
+      "volumes": [
+        {
+          "name": "neodata",
+          "path": "/data"
+        }
+      ]
+    },
+    {
+      "name": "qdrant",
+      "type": "custom",
+      "image": "qdrant/qdrant:v1.12",
+      "port": 6333,
+      "volumes": [
+        {
+          "name": "qdrantdata",
+          "path": "/qdrant/storage"
+        }
+      ]
+    }
+  ]
+}
