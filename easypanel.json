@@ -51,7 +51,6 @@
       "name": "neo4j",
       "type": "custom",
       "image": "neo4j:5-community",
-      "port": 7474,
       "environment": {
         "NEO4J_AUTH": "neo4j/awren2026",
         "NEO4J_PLUGINS": "[\"apoc\"]"
@@ -67,7 +66,6 @@
       "name": "qdrant",
       "type": "custom",
       "image": "qdrant/qdrant:v1.12",
-      "port": 6333,
       "volumes": [
         {
           "name": "qdrantdata",

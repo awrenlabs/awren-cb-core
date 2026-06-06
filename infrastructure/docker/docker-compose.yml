@@ -3,8 +3,6 @@ services:
     build:
       context: ../..
       dockerfile: apps/api/Dockerfile
-    ports:
-      - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://awren:awren@postgres:5432/awren
       - NEO4J_URI=bolt://neo4j:7687
@@ -38,8 +36,6 @@ services:
       POSTGRES_USER: awren
       POSTGRES_PASSWORD: awren
       POSTGRES_DB: awren
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ../postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -58,9 +54,6 @@ services:
     environment:
       NEO4J_AUTH: neo4j/awren2026
       NEO4J_PLUGINS: '["apoc"]'
-    ports:
-      - "7474:7474"
-      - "7687:7687"
     volumes:
       - neodata:/data
       - ../neo4j/init.cypher:/docker-entrypoint-initdb.d/init.cypher:ro
@@ -76,9 +69,6 @@ services:
 
   qdrant:
     image: qdrant/qdrant:v1.12
-    ports:
-      - "6333:6333"
-      - "6334:6334"
     volumes:
       - qdrantdata:/qdrant/storage
     healthcheck:
