@@ -1,0 +1,21 @@
+name: Test
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: awren
+          POSTGRES_PASSWORD: awren
+          POSTGRES_DB: awren
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install poetry && poetry install
+      - run: poetry run pytest tests/ -v --cov=packages

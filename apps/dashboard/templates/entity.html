@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}{{ entity.label }}{% endblock %}
+{% block heading %}{{ entity.label }}{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div class="page-heading-text">
+        <h2>{{ entity.label }}</h2>
+        <p><span class="badge badge-type">{{ entity.type }}</span> · <span class="id-cell">{{ entity.id }}</span></p>
+    </div>
+    <div class="page-actions">
+        <a href="/dashboard/entities" class="btn btn-secondary btn-sm">← Back</a>
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('editModal').classList.add('show')">Edit</button>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <!-- Entity Info -->
+    <div class="card">
+        <div class="card-header">
+            <h3>◆ Entity Details</h3>
+        </div>
+        <div style="display: grid; gap: 16px;">
+            <div>
+                <label style="display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); font-weight: 600; margin-bottom: 4px;">ID</label>
+                <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); word-break: break-all;">{{ entity.id }}</div>
+            </div>
+            <div>
+                <label style="display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); font-weight: 600; margin-bottom: 4px;">Type</label>
+                <div><span class="badge badge-type">{{ entity.type }}</span></div>
+            </div>
+            <div>
+                <label style="display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); font-weight: 600; margin-bottom: 4px;">Label</label>
+                <div style="font-size: 15px; font-weight: 600; font-family: var(--font-display);">{{ entity.label }}</div>
+            </div>
+            <div>
+                <label style="display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); font-weight: 600; margin-bottom: 4px;">Description</label>
+                <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;">{{ entity.description or 'No description provided.' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Properties & Metadata -->
+    <div>
+        <div class="card" style="margin-bottom: 16px;">
+            <div class="card-header">
+                <h3>◈ Properties</h3>
+            </div>
+            {% if entity.properties %}
+            <pre>{{ entity.properties | tojson(indent=2) }}</pre>
+            {% else %}
+            <div style="font-size: 12px; color: var(--text-muted); text-align: center; padding: 16px;">No custom properties</div>
+            {% endif %}
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h3>◉ Metadata</h3>
+            </div>
+            {% if entity.metadata %}
+            <pre>{{ entity.metadata | tojson(indent=2) }}</pre>
+            {% else %}
+            <div style="font-size: 12px; color: var(--text-muted); text-align: center; padding: 16px;">No metadata</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Event History -->
+<div class="card" style="margin-top: 4px;">
+    <div class="card-header">
+        <h3>◈ Event History</h3>
+        <span style="font-size: 11px; color: var(--text-tertiary);">{{ events|length }} event{{ 's' if events|length != 1 else '' }}</span>
+    </div>
+    {% if events %}
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Timestamp</th>
+                    <th>Source</th>
+                    <th>Changes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in events %}
+                <tr>
+                    <td><span class="badge badge-event">{{ event.type }}</span></td>
+                    <td style="font-size: 11px; color: var(--text-muted); white-space: nowrap;">{{ event.timestamp[:19] }}</td>
+                    <td style="font-size: 12px;">{{ event.source }}</td>
+                    <td style="font-size: 11px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-mono); color: var(--text-tertiary);">{{ event.payload | tojson(indent=0) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding: 32px;">
+        <div class="empty-icon">◈</div>
+        <h4>No events recorded</h4>
+        <p>This entity has no event history yet. Events are recorded on create, update, and delete operations.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>✎ Edit Entity</h3>
+            <button class="modal-close" onclick="this.closest('.modal-overlay').classList.remove('show')">✕</button>
+        </div>
+        <form hx-patch="/dashboard/api/entities/{{ entity.id }}" hx-target="#toasts" hx-swap="innerHTML"
+              hx-on::after-request="if(event.detail.successful) { document.getElementById('editModal').classList.remove('show'); setTimeout(() => window.location.reload(), 500); }">
+            <div class="form-group">
+                <label for="label">Label</label>
+                <input type="text" id="label" name="label" class="form-input" value="{{ entity.label }}">
+            </div>
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" name="description" class="form-textarea" style="min-height: 80px;">{{ entity.description or '' }}</textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').classList.remove('show')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

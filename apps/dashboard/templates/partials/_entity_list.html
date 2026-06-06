@@ -1,0 +1,12 @@
+{% for entity in entities %}
+<tr>
+    <td class="id-cell">{{ entity.id[:8] }}...</td>
+    <td><span class="badge badge-type">{{ entity.type }}</span></td>
+    <td><a href="/dashboard/entities/{{ entity.id }}">{{ entity.label }}</a></td>
+    <td style="font-size: 12px;">{{ (entity.description or '')[:60] }}</td>
+</tr>
+{% else %}
+<tr>
+    <td colspan="4"><div class="empty-state" style="padding: 24px;"><p>No entities found.</p></div></td>
+</tr>
+{% endfor %}

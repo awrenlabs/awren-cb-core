@@ -1,0 +1,60 @@
+<div class="agent-result fade-in">
+    {% if query %}
+    <div style="font-size: 11px; color: var(--text-tertiary); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--surface-border);">
+        Query: <strong style="color: var(--text-primary);">{{ query }}</strong>
+        <span style="margin-left: auto; font-size: 10px; color: var(--text-muted); float: right;">
+            {{ "%.0f"|format(result.execution_time_ms) }}ms
+        </span>
+    </div>
+    {% endif %}
+
+    <div class="agent-section">
+        <h4>✦ Entities Found ({{ result.output.entity_count }})</h4>
+        {% for e in result.output.entities[:10] %}
+        <div class="agent-item">
+            <span class="badge badge-type" style="font-size: 10px;">{{ e.type.split(':')[-1] if ':' in e.type else e.type }}</span>
+            <a href="/dashboard/entities/{{ e.id }}" style="font-size: 13px;">{{ e.label }}</a>
+        </div>
+        {% else %}
+        <div class="agent-item" style="color: var(--text-muted);">No entities found</div>
+        {% endfor %}
+    </div>
+
+    {% if result.output.deductive_conclusions %}
+    <div class="agent-section">
+        <h4>⊢ Deductive Conclusions</h4>
+        {% for c in result.output.deductive_conclusions %}
+        <div class="agent-item">
+            <span style="flex: 1;">{{ c.conclusion }}</span>
+            <span class="confidence">{{ "%.0f"|format(c.confidence * 100) }}%</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if result.output.inductive_patterns %}
+    <div class="agent-section">
+        <h4>~ Inductive Patterns</h4>
+        {% for p in result.output.inductive_patterns %}
+        <div class="agent-item">{{ p.pattern }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if result.output.abductive_explanations %}
+    <div class="agent-section">
+        <h4>← Abductive Explanations</h4>
+        {% for e in result.output.abductive_explanations %}
+        <div class="agent-item">
+            <span style="flex: 1;">{{ e.hypothesis }}</span>
+            <span class="confidence">{{ "%.0f"|format(e.plausibility * 100) }}%</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div style="margin-top: 12px; display: flex; gap: 12px; font-size: 10px; color: var(--text-tertiary); border-top: 1px solid var(--surface-border); padding-top: 10px;">
+        <span>Confidence: <strong style="color: var(--accent);">{{ "%.1f"|format(result.confidence * 100) }}%</strong></span>
+        <span>Entities: <strong>{{ result.output.entity_count }}</strong></span>
+    </div>
+</div>

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Events{% endblock %}
+{% block heading %}Event Timeline{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div class="page-heading-text">
+        <h2>Event Timeline</h2>
+        <p>Append-only event log with full audit trail</p>
+    </div>
+</div>
+
+<div class="card" style="padding: 0;">
+    {% if events %}
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Event</th>
+                    <th>Subject</th>
+                    <th>Source</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in events %}
+                <tr>
+                    <td style="font-size: 11px; color: var(--text-muted); white-space: nowrap;">{{ event.timestamp[:19] }}</td>
+                    <td>
+                        <span class="badge {% if 'CREATED' in event.type %}badge-green{% elif 'ARCHIVED' in event.type or 'DELETED' in event.type %}badge-red{% elif 'UPDATED' in event.type %}badge-event{% else %}badge-purple{% endif %}">
+                            {{ event.type.split('.')[-1] if '.' in event.type else event.type }}
+                        </span>
+                    </td>
+                    <td class="id-cell" style="font-family: var(--font-mono); font-size: 11px;">{{ event.subject_id[:12] }}...</td>
+                    <td style="font-size: 12px;">{{ event.source }}</td>
+                    <td style="font-size: 11px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-mono); color: var(--text-tertiary);">{{ event.payload | tojson(indent=0) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding: 60px 24px;">
+        <div class="empty-icon">◈</div>
+        <h4>No events recorded</h4>
+        <p>The event log is empty. Events are automatically created when entities are created, updated, or deleted.</p>
+        <div style="margin-top: 16px;">
+            <a href="/dashboard/entities" class="btn btn-primary btn-sm">Browse Entities</a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

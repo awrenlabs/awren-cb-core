@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Entities{% endblock %}
+{% block heading %}Entities{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div class="page-heading-text">
+        <h2>Entities</h2>
+        <p>Browse and manage knowledge graph entities · {{ total }} total</p>
+    </div>
+    <div class="page-actions">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('createModal').classList.add('show')">+ New Entity</button>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card" style="padding: 16px 20px;">
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <span style="font-size: 12px; color: var(--text-tertiary); font-weight: 500;">Filter:</span>
+        <select id="typeFilter" class="form-select" style="width: auto; padding: 6px 28px 6px 10px; font-size: 12px;" onchange="window.location.href=this.value ? '/dashboard/entities?type='+encodeURIComponent(this.value) : '/dashboard/entities'">
+            <option value="">All Types</option>
+            {% for t in ['core:Organization', 'core:Person', 'core:Project', 'core:Document', 'core:Concept', 'core:Asset', 'core:Location'] %}
+            <option value="{{ t }}" {% if filter_type == t %}selected{% endif %}>{{ t.split(':')[-1] }}</option>
+            {% endfor %}
+        </select>
+        <span style="font-size: 11px; color: var(--text-muted); margin-left: auto;">{{ total }} entity{{ 'ies' if total != 1 else 'y' }} found</span>
+    </div>
+</div>
+
+<!-- Entity List -->
+<div class="card" style="padding: 0;">
+    {% if entities %}
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Type</th>
+                    <th>Label</th>
+                    <th>Description</th>
+                    <th style="width: 60px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entity in entities %}
+                <tr>
+                    <td class="id-cell">{{ entity.id[:10] }}...</td>
+                    <td><span class="badge badge-type">{{ entity.type.split(':')[-1] if ':' in entity.type else entity.type }}</span></td>
+                    <td><a href="/dashboard/entities/{{ entity.id }}" style="font-weight: 500;">{{ entity.label }}</a></td>
+                    <td style="font-size: 12px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-tertiary);">{{ entity.description or '—' }}</td>
+                    <td><a href="/dashboard/entities/{{ entity.id }}" class="btn btn-ghost btn-xs">View</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding: 60px 24px;">
+        <div class="empty-icon">◆</div>
+        <h4>No entities found</h4>
+        <p>{% if filter_type %}No entities of type <code>{{ filter_type }}</code> exist yet. Try a different filter.{% else %}The knowledge graph is empty. Create your first entity to get started.{% endif %}</p>
+        <div style="margin-top: 16px;">
+            <button class="btn btn-primary btn-sm" onclick="document.getElementById('createModal').classList.add('show')">+ Create Entity</button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Create Entity Modal -->
+<div class="modal-overlay" id="createModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>◆ New Entity</h3>
+            <button class="modal-close" onclick="this.closest('.modal-overlay').classList.remove('show')">✕</button>
+        </div>
+        <form hx-post="/dashboard/api/entities" hx-target="#toasts" hx-swap="innerHTML"
+              hx-on::after-request="if(event.detail.successful) { document.getElementById('createModal').classList.remove('show'); setTimeout(() => window.location.reload(), 500); }">
+            <div class="form-group">
+                <label for="type">Entity Type</label>
+                <select id="type" name="type" class="form-select" required>
+                    <option value="">Select type...</option>
+                    <option value="core:Organization">Organization</option>
+                    <option value="core:Person">Person</option>
+                    <option value="core:Project">Project</option>
+                    <option value="core:Document">Document</option>
+                    <option value="core:Concept">Concept</option>
+                    <option value="core:Asset">Asset</option>
+                    <option value="core:Location">Location</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="label">Label</label>
+                <input type="text" id="label" name="label" class="form-input" placeholder="e.g., Awren Labs" required>
+            </div>
+            <div class="form-group">
+                <label for="description">Description <span style="color: var(--text-muted); font-weight: 400; text-transform: none;">(optional)</span></label>
+                <textarea id="description" name="description" class="form-textarea" placeholder="Brief description of this entity..." style="min-height: 60px;"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').classList.remove('show')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Entity</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

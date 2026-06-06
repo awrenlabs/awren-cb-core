@@ -1,0 +1,43 @@
+"""Construction domain ontology definitions."""
+from awren_ontology import Ontology, OntologyClass, OntologyProperty
+
+CONSTRUCTION_ONTOLOGY = Ontology(
+    name="construction",
+    namespace="https://awren.ai/ontology/construction",
+    version="0.1.0",
+    description="Construction industry ontology for the Construction Brain.",
+    classes={
+        "con:Project": OntologyClass(id="con:Project", label="Construction Project",
+            description="A construction or infrastructure project"),
+        "con:Contract": OntologyClass(id="con:Contract", label="Contract",
+            description="A legal contract governing construction work"),
+        "con:Resource": OntologyClass(id="con:Resource", label="Resource",
+            description="A resource used in construction (material, equipment, labor)"),
+        "con:Risk": OntologyClass(id="con:Risk", label="Risk",
+            description="A project risk or issue"),
+        "con:Site": OntologyClass(id="con:Site", label="Site",
+            description="A physical construction site"),
+        "con:Permit": OntologyClass(id="con:Permit", label="Permit",
+            description="A regulatory permit or approval"),
+        "con:Milestone": OntologyClass(id="con:Milestone", label="Milestone",
+            description="A project milestone or phase"),
+        "con:Stakeholder": OntologyClass(id="con:Stakeholder", label="Stakeholder",
+            description="A project stakeholder"),
+    },
+    properties={
+        "con:hasContract": OntologyProperty(id="con:hasContract", label="has contract",
+            domain=["con:Project"], range=["con:Contract"]),
+        "con:hasResource": OntologyProperty(id="con:hasResource", label="has resource",
+            domain=["con:Project"], range=["con:Resource"]),
+        "con:hasRisk": OntologyProperty(id="con:hasRisk", label="has risk",
+            domain=["con:Project"], range=["con:Risk"]),
+        "con:locatedAt": OntologyProperty(id="con:locatedAt", label="located at",
+            domain=["con:Project"], range=["con:Site"]),
+        "con:requiresPermit": OntologyProperty(id="con:requiresPermit", label="requires permit",
+            domain=["con:Project"], range=["con:Permit"]),
+        "con:hasMilestone": OntologyProperty(id="con:hasMilestone", label="has milestone",
+            domain=["con:Project"], range=["con:Milestone"]),
+        "con:involves": OntologyProperty(id="con:involves", label="involves",
+            domain=["con:Project"], range=["con:Stakeholder"]),
+    },
+)

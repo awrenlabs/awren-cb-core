@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+{% block heading %}Overview{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div class="page-heading-text">
+        <h2>Dashboard</h2>
+        <p>System overview and key metrics for the Cognitive OS</p>
+    </div>
+    <div class="page-actions">
+        <a href="/dashboard/entities" class="btn btn-secondary btn-sm">Browse Entities</a>
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('createModal').classList.add('show')">+ New Entity</button>
+    </div>
+</div>
+
+<!-- Stats Grid -->
+<div class="stats-grid">
+    <div class="stat-card accent" id="stat-entities">
+        <div class="stat-icon">◆</div>
+        <div class="stat-value">{{ total_entities }}</div>
+        <div class="stat-label">Total Entities</div>
+        <div class="stat-trend">Knowledge graph nodes</div>
+    </div>
+    <div class="stat-card blue" id="stat-events">
+        <div class="stat-icon">◈</div>
+        <div class="stat-value">{{ total_events }}</div>
+        <div class="stat-label">Recent Events</div>
+        <div class="stat-trend">Last 24 hours</div>
+    </div>
+    <div class="stat-card green" id="stat-memories">
+        <div class="stat-icon">◉</div>
+        <div class="stat-value">{{ memory_count }}</div>
+        <div class="stat-label">Memories</div>
+        <div class="stat-trend">Vector store entries</div>
+    </div>
+    <div class="stat-card purple" id="stat-collections">
+        <div class="stat-icon">◈</div>
+        <div class="stat-value">4</div>
+        <div class="stat-label">Memory Collections</div>
+        <div class="stat-trend">Episodic, Semantic, Procedural, Working</div>
+    </div>
+</div>
+
+<!-- Two-column layout -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <!-- Recent Entities -->
+    <div class="card">
+        <div class="card-header">
+            <h3>◆ Recent Entities</h3>
+            <a href="/dashboard/entities" class="btn btn-ghost btn-sm card-action">View All →</a>
+        </div>
+        {% if entities %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Label</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entity in entities %}
+                    <tr>
+                        <td><span class="badge badge-type">{{ entity.type.split(':')[-1] if ':' in entity.type else entity.type }}</span></td>
+                        <td><a href="/dashboard/entities/{{ entity.id }}">{{ entity.label }}</a></td>
+                        <td style="text-align: right;"><a href="/dashboard/entities/{{ entity.id }}" class="btn btn-ghost btn-xs">Open →</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">◆</div>
+            <h4>No entities yet</h4>
+            <p>Create your first entity to start building the knowledge graph.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Events -->
+    <div class="card">
+        <div class="card-header">
+            <h3>◈ Recent Events</h3>
+            <a href="/dashboard/events" class="btn btn-ghost btn-sm card-action">View All →</a>
+        </div>
+        {% if events %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Event</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in events %}
+                    <tr>
+                        <td>
+                            <span class="badge badge-event">{{ event.type }}</span>
+                            <span class="id-cell" style="margin-left: 6px;">{{ event.subject_id[:10] }}...</span>
+                        </td>
+                        <td style="font-size: 11px; color: var(--text-muted); white-space: nowrap;">{{ event.timestamp[:19] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">◈</div>
+            <h4>No events yet</h4>
+            <p>Events are automatically recorded when entities are created or modified.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Memory Engine Status -->
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h3>◉ Memory Engine Status</h3>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+        <div style="padding: 16px; background: var(--bg-deep); border-radius: var(--radius-md); border: 1px solid var(--surface-border); text-align: center;">
+            <div style="font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--accent); margin-bottom: 4px;">Episodic</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Event memories</div>
+        </div>
+        <div style="padding: 16px; background: var(--bg-deep); border-radius: var(--radius-md); border: 1px solid var(--surface-border); text-align: center;">
+            <div style="font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--blue); margin-bottom: 4px;">Semantic</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Factual knowledge</div>
+        </div>
+        <div style="padding: 16px; background: var(--bg-deep); border-radius: var(--radius-md); border: 1px solid var(--surface-border); text-align: center;">
+            <div style="font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--purple); margin-bottom: 4px;">Procedural</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Processes & workflows</div>
+        </div>
+        <div style="padding: 16px; background: var(--bg-deep); border-radius: var(--radius-md); border: 1px solid var(--surface-border); text-align: center;">
+            <div style="font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--green); margin-bottom: 4px;">Working</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Active context</div>
+        </div>
+    </div>
+    <div style="margin-top: 12px; font-size: 11px; color: var(--text-tertiary); border-top: 1px solid var(--surface-border); padding-top: 12px;">
+        Embedding model: <code>text-embedding-3-small</code> · {{ memory_status }}
+    </div>
+</div>
+
+<!-- Create Entity Modal -->
+<div class="modal-overlay" id="createModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>◆ New Entity</h3>
+            <button class="modal-close" onclick="this.closest('.modal-overlay').classList.remove('show')">✕</button>
+        </div>
+        <form hx-post="/dashboard/api/entities" hx-target="#toasts" hx-swap="innerHTML"
+              hx-on::after-request="if(event.detail.successful) { document.getElementById('createModal').classList.remove('show'); setTimeout(() => window.location.reload(), 500); }">
+            <div class="form-group">
+                <label for="type">Entity Type</label>
+                <select id="type" name="type" class="form-select" required>
+                    <option value="">Select type...</option>
+                    <option value="core:Organization">Organization</option>
+                    <option value="core:Person">Person</option>
+                    <option value="core:Project">Project</option>
+                    <option value="core:Document">Document</option>
+                    <option value="core:Concept">Concept</option>
+                    <option value="core:Asset">Asset</option>
+                    <option value="core:Location">Location</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="label">Label</label>
+                <input type="text" id="label" name="label" class="form-input" placeholder="e.g., Awren Labs" required>
+            </div>
+            <div class="form-group">
+                <label for="description">Description <span style="color: var(--text-muted); font-weight: 400; text-transform: none;">(optional)</span></label>
+                <textarea id="description" name="description" class="form-textarea" placeholder="Brief description of this entity..." style="min-height: 60px;"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').classList.remove('show')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Entity</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

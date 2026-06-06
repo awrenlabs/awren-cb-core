@@ -1,0 +1,46 @@
+{
+  "collections": [
+    {
+      "name": "entities",
+      "vectors": {
+        "size": 1536,
+        "distance": "Cosine"
+      }
+    },
+    {
+      "name": "documents",
+      "vectors": {
+        "size": 1536,
+        "distance": "Cosine"
+      }
+    },
+    {
+      "name": "memory_episodic",
+      "vectors": {
+        "size": 1536,
+        "distance": "Cosine"
+      }
+    },
+    {
+      "name": "memory_semantic",
+      "vectors": {
+        "size": 1536,
+        "distance": "Cosine"
+      }
+    },
+    {
+      "name": "memory_procedural",
+      "vectors": {
+        "size": 1536,
+        "distance": "Cosine"
+      }
+    },
+    {
+      "name": "memory_working",
+      "vectors": {
+        "size": 1536,
+        "distance": "Cosine"
+      }
+    }
+  ]
+}

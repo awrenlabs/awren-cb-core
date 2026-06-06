@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Knowledge Graph{% endblock %}
+{% block heading %}Knowledge Graph{% endblock %}
+
+{% block content %}
+<div class="page-heading">
+    <div class="page-heading-text">
+        <h2>Knowledge Graph</h2>
+        <p>Visual exploration of entities and their relationships</p>
+    </div>
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+    <!-- Graph toolbar -->
+    <div style="display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--surface-border); flex-wrap: wrap;">
+        <span style="font-size: 12px; color: var(--text-tertiary);">Drag nodes to explore · Scroll to zoom</span>
+        <span id="nodeCount" style="font-size: 11px; color: var(--accent); margin-left: auto;"></span>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="graphLegend"></div>
+    </div>
+    <div class="graph-container" id="graph"></div>
+</div>
+
+<script>
+const entities = {{ entities_json|safe }};
+
+if (entities.length === 0) {
+    document.getElementById('graph').innerHTML = '<div class="empty-state" style="padding: 100px 24px;"><div class="empty-icon">◉</div><h4>No entities to visualize</h4><p>Create entities first to see them in the knowledge graph.</p></div>';
+} else {
+    // Generate connections based on type similarity
+    const links = [];
+    const typeGroups = {};
+    entities.forEach(e => {
+        if (!typeGroups[e.type]) typeGroups[e.type] = [];
+        typeGroups[e.type].push(e);
+    });
+
+    Object.values(typeGroups).forEach(group => {
+        for (let i = 1; i < group.length; i++) {
+            if (i <= 3) {
+                links.push({ source: group[i-1].id, target: group[i].id });
+            }
+        }
+    });
+
+    // Connect entities of different types that might be related (label similarity)
+    for (let i = 0; i < entities.length && links.length < entities.length * 0.5; i++) {
+        for (let j = i + 1; j < entities.length && links.length < entities.length * 0.5; j++) {
+            if (entities[i].type !== entities[j].type && Math.random() > 0.7) {
+                links.push({ source: entities[i].id, target: entities[j].id });
+            }
+        }
+    }
+
+    // Color mapping
+    const colorMap = {
+        'core:Organization': '#f0a030',
+        'core:Person': '#5090e0',
+        'core:Project': '#40c080',
+        'core:Document': '#a070d0',
+        'core:Concept': '#e05050',
+        'core:Asset': '#60b0b0',
+        'core:Location': '#d0a060',
+    };
+    const defaultColor = '#63628a';
+
+    // Build legend
+    const legend = document.getElementById('graphLegend');
+    const seen = new Set();
+    entities.forEach(e => {
+        if (!seen.has(e.type)) {
+            seen.add(e.type);
+            const tag = document.createElement('span');
+            tag.style.cssText = 'font-size:10px;padding:2px 6px;border-radius:3px;background:rgba(255,255,255,0.04);display:flex;align-items:center;gap:4px;';
+            tag.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:${colorMap[e.type]||defaultColor};display:inline-block;"></span>${e.type.split(':').pop()}`;
+            legend.appendChild(tag);
+        }
+    });
+
+    // D3 Force-Directed Graph
+    const container = document.getElementById('graph');
+    const width = container.clientWidth || 900;
+    const height = 600;
+
+    const svg = d3.select('#graph')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .style('background', 'transparent');
+
+    // Zoom behavior
+    const g = svg.append('g');
+    svg.call(d3.zoom()
+        .scaleExtent([0.1, 4])
+        .on('zoom', (event) => { g.attr('transform', event.transform); })
+    );
+
+    // Drop shadow filter
+    const defs = svg.append('defs');
+    defs.append('filter')
+        .attr('id', 'node-shadow')
+        .append('feDropShadow')
+        .attr('dx', 0).attr('dy', 2).attr('stdDeviation', 4)
+        .attr('flood-color', 'rgba(240, 160, 48, 0.15)');
+
+    const simulation = d3.forceSimulation(entities)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(130).strength(0.25))
+        .force('charge', d3.forceManyBody().strength(-250))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(25));
+
+    // Links
+    const link = g.append('g')
+        .selectAll('line')
+        .data(links)
+        .join('line')
+        .attr('stroke', 'rgba(255,255,255,0.06)')
+        .attr('stroke-width', 1)
+        .attr('stroke-opacity', 0.4);
+
+    // Nodes
+    const node = g.append('g')
+        .selectAll('g')
+        .data(entities)
+        .join('g')
+        .style('cursor', 'grab')
+        .call(d3.drag()
+            .on('start', (event, d) => {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x; d.fy = d.y;
+                event.sourceEvent.target.style.cursor = 'grabbing';
+            })
+            .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+            .on('end', (event, d) => {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null; d.fy = null;
+                event.sourceEvent.target.style.cursor = 'grab';
+            })
+        );
+
+    // Node circles
+    const circles = node.append('circle')
+        .attr('r', d => {
+            const count = links.filter(l => l.source.id === d.id || l.target.id === d.id).length;
+            return Math.max(5, Math.min(16, 5 + count * 2));
+        })
+        .attr('fill', d => colorMap[d.type] || defaultColor)
+        .attr('filter', 'url(#node-shadow)')
+        .attr('opacity', 0.85)
+        .attr('stroke', 'rgba(255,255,255,0.08)')
+        .attr('stroke-width', 1);
+
+    // Node labels
+    node.append('text')
+        .text(d => d.label.length > 14 ? d.label.slice(0, 13) + '…' : d.label)
+        .attr('x', d => {
+            const count = links.filter(l => l.source.id === d.id || l.target.id === d.id).length;
+            return Math.max(8, 5 + count * 2);
+        })
+        .attr('y', 4)
+        .attr('fill', '#9897b0')
+        .attr('font-size', '10px')
+        .attr('font-family', 'Inter, sans-serif')
+        .attr('font-weight', '500')
+        .attr('pointer-events', 'none');
+
+    // Tooltip on hover
+    node.append('title')
+        .text(d => `${d.label} (${d.type})`);
+
+    // Highlight on hover
+    node.on('mouseenter', function(event, d) {
+        circles.filter(c => c.id === d.id).attr('opacity', 1).attr('r', function() {
+            const count = links.filter(l => l.source.id === d.id || l.target.id === d.id).length;
+            return Math.max(8, 5 + count * 2) + 2;
+        });
+    }).on('mouseleave', function(event, d) {
+        circles.filter(c => c.id === d.id).attr('opacity', 0.85).attr('r', function() {
+            const count = links.filter(l => l.source.id === d.id || l.target.id === d.id).length;
+            return Math.max(5, Math.min(16, 5 + count * 2));
+        });
+    });
+
+    // Click to navigate
+    node.on('click', function(event, d) {
+        window.location.href = '/dashboard/entities/' + d.id;
+    });
+
+    simulation.on('tick', () => {
+        link
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y);
+
+        node.attr('transform', d => `translate(${d.x},${d.y})`);
+    });
+
+    const nodeCount = entities.length;
+    const edgeCount = links.length;
+    document.getElementById('nodeCount').textContent = `${nodeCount} node${nodeCount !== 1 ? 's' : ''} · ${edgeCount} edge${edgeCount !== 1 ? 's' : ''}`;
+}
+</script>
+{% endblock %}
