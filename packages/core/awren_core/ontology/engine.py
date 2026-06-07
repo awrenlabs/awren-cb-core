@@ -455,3 +455,40 @@ class OntologyEngine:
                 )
             created.append(type_name)
         return created
+
+    # ------------------------------------------------------------------
+    # Entity access (implements OntologyLayer protocol)
+    # ------------------------------------------------------------------
+
+    async def get_entity(self, entity_id: UUID) -> Optional[dict[str, Any]]:
+        """Get an entity by ID as a dict."""
+        entity = await self._entity_repo.get(entity_id)
+        if not entity:
+            return None
+        return {
+            "id": str(entity.id),
+            "type": entity.type,
+            "label": entity.label,
+            "description": entity.description,
+            "properties": entity.properties or {},
+            "identifiers": entity.identifiers or [],
+            "state": entity.state,
+            "provenance": entity.provenance or {},
+            "metadata": entity.metadata or {},
+        }
+
+    async def update_entity(
+        self, entity_id: UUID, **kwargs: Any
+    ) -> dict[str, Any]:
+        """Update entity attributes."""
+        entity = await self._entity_repo.get(entity_id)
+        if not entity:
+            raise ValueError(f"Entity {entity_id} not found")
+        for key, value in kwargs.items():
+            if hasattr(entity, key):
+                setattr(entity, key, value)
+            elif key in ("properties",) and isinstance(value, dict):
+                for k, v in value.items():
+                    entity.properties[k] = v
+        updated = await self._entity_repo.update(entity)
+        return await self.get_entity(updated.id)

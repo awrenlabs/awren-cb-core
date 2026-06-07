@@ -18,6 +18,7 @@ packages = [
     { include = "awren_ingestion", from = "packages/ingestion" },
     { include = "awren_observability", from = "packages/observability" },
     { include = "awren_sdk", from = "packages/sdk" },
+    { include = "awren_actions", from = "packages/actions" },
 ]
 
 [tool.poetry.dependencies]

@@ -66,6 +66,8 @@ from awren_core.auth import (
     verify_password,
 )
 from awren_core.causality import CausalEngine
+from awren_actions import ActionRegistry
+from awren_actions.layer import OntologyActionLayer
 from awren_core.explainability import ExplainabilityEngine, Explanation
 from awren_core.knowledge import KnowledgeEngine
 from awren_core.ontology.engine import OntologyEngine
@@ -74,6 +76,10 @@ from awren_core.orm_models import (
     KnowledgeEdgeModel, CausalChainModel, UserModel,
 )
 from awren_core.schemas import (
+    ActionDefResponse,
+    ActionExecuteRequest,
+    ActionExecuteResponse,
+    ActionListResponse,
     APIKeyGenerateRequest,
     APIKeyResponse,
     AgentQueryRequest,
@@ -1540,6 +1546,74 @@ async def list_causal_chains(
     eid = UUID(entity_id) if entity_id else None
     chains = await engine.list_chains(entity_id=eid, limit=limit, offset=offset)
     return {"chains": chains, "total": len(chains)}
+
+
+# ---------------------------------------------------------------------------
+# Action Framework — Executable Actions on Ontology Objects
+# ---------------------------------------------------------------------------
+
+_action_registry: Optional[ActionRegistry] = None
+
+
+def _get_action_layer(
+    db: Session = Depends(get_db),
+) -> OntologyActionLayer:
+    global _action_registry
+    ontology = OntologyEngine(db)
+    if _action_registry is None:
+        layer = OntologyActionLayer.create_with_defaults(ontology=ontology)
+        _action_registry = layer.registry
+    else:
+        layer = OntologyActionLayer(registry=_action_registry, ontology=ontology)
+    return layer
+
+
+@app.get("/api/v1/actions", response_model=ActionListResponse, tags=["Actions"])
+async def list_actions(
+    type_name: Optional[str] = Query(None, description="Filter by ontology type"),
+    layer: OntologyActionLayer = Depends(_get_action_layer),
+) -> dict[str, Any]:
+    """List all executable actions, optionally filtered by ontology type."""
+    actions = await layer.list_actions(type_name=type_name)
+    return {"actions": actions, "total": len(actions)}
+
+
+@app.post(
+    "/api/v1/actions/execute",
+    response_model=ActionExecuteResponse,
+    tags=["Actions"],
+)
+async def execute_action(
+    payload: ActionExecuteRequest,
+    current_user: UserModel = Depends(get_current_user),
+    layer: OntologyActionLayer = Depends(_get_action_layer),
+) -> ActionExecuteResponse:
+    """Execute an action on an ontology object."""
+    entity_id = UUID(payload.entity_id)
+    result = await layer.execute_action(
+        action_name=payload.action_name,
+        entity_id=entity_id,
+        params=payload.params,
+        user=current_user,
+    )
+    return ActionExecuteResponse(**result)
+
+
+@app.get(
+    "/api/v1/actions/{action_name}",
+    response_model=ActionDefResponse,
+    tags=["Actions"],
+)
+async def get_action_detail(
+    action_name: str,
+    type_name: str = Query(..., description="Ontology type this action belongs to"),
+    layer: OntologyActionLayer = Depends(_get_action_layer),
+) -> Optional[ActionDefResponse]:
+    """Get details of a specific action."""
+    adef = await layer.get_action(action_name, type_name)
+    if not adef:
+        raise HTTPException(status_code=404, detail=f"Action '{action_name}' not found for type '{type_name}'")
+    return ActionDefResponse(**adef)
 
 
 # ---------------------------------------------------------------------------

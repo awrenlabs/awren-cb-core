@@ -519,3 +519,39 @@ class ExplanationResponse(BaseModel):
     assumptions: list[str]
     alternatives_considered: list[str]
     limitations: list[str]
+
+
+# ---------------------------------------------------------------------------
+# Action Framework schemas
+# ---------------------------------------------------------------------------
+
+
+class ActionDefResponse(BaseModel):
+    name: str
+    types: list[str]
+    description: str
+    input_schema: dict[str, Any] = {}
+    output_schema: dict[str, Any] = {}
+    required_permission: str = "execute"
+    tags: list[str] = []
+
+
+class ActionExecuteRequest(BaseModel):
+    action_name: str
+    entity_id: str
+    params: dict[str, Any] = {}
+
+
+class ActionExecuteResponse(BaseModel):
+    success: bool
+    data: dict[str, Any]
+    action_name: str
+    entity_id: str
+    message: str = ""
+    error: Optional[str] = None
+    elapsed_ms: float = 0.0
+
+
+class ActionListResponse(BaseModel):
+    actions: list[ActionDefResponse]
+    total: int
