@@ -39,6 +39,15 @@ class OntologyLayer(Protocol):
     async def get_version_history(self, entity_id: UUID) -> list[dict[str, Any]]:
         ...
 
+    async def query_entities(
+        self,
+        type_name: str,
+        query: str = "",
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        ...
+
 
 # ---------------------------------------------------------------------------
 # Knowledge Layer
@@ -169,6 +178,25 @@ class AgentLayer(Protocol):
         ...
 
     async def list_agents(self) -> list[dict[str, Any]]:
+        ...
+
+    async def get_agent(self, agent_name: str) -> Optional[dict[str, Any]]:
+        ...
+
+    async def create_task(
+        self,
+        agent_name: str,
+        input: dict[str, Any],
+        user: Any,
+    ) -> dict[str, Any]:
+        ...
+
+    async def get_task(self, task_id: str) -> Optional[dict[str, Any]]:
+        ...
+
+    async def list_tasks(
+        self, agent_name: Optional[str] = None, limit: int = 50, offset: int = 0
+    ) -> list[dict[str, Any]]:
         ...
 
 

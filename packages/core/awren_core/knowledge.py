@@ -347,6 +347,15 @@ class KnowledgeEngine:
             "total_edges": edge_count,
         }
 
+    async def query(
+        self,
+        query: str,
+        kinds: Optional[list[str]] = None,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Alias for query_knowledge — implements KnowledgeLayer protocol."""
+        return await self.query_knowledge(query=query, kinds=kinds, limit=limit)
+
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------

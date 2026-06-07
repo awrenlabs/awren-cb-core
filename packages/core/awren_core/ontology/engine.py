@@ -492,3 +492,27 @@ class OntologyEngine:
                     entity.properties[k] = v
         updated = await self._entity_repo.update(entity)
         return await self.get_entity(updated.id)
+
+    async def query_entities(
+        self,
+        type_name: str,
+        query: str = "",
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Query entities by type and optional label search."""
+        entities = await self._entity_repo.query(
+            query=query,
+            params={"type": type_name, "limit": limit, "offset": offset},
+        )
+        return [
+            {
+                "id": str(e.id),
+                "type": e.type,
+                "label": e.label,
+                "description": e.description,
+                "properties": e.properties or {},
+                "state": e.state,
+            }
+            for e in entities
+        ]

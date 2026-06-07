@@ -19,6 +19,7 @@ packages = [
     { include = "awren_observability", from = "packages/observability" },
     { include = "awren_sdk", from = "packages/sdk" },
     { include = "awren_actions", from = "packages/actions" },
+    { include = "awren_agents", from = "packages/agents" },
 ]
 
 [tool.poetry.dependencies]

@@ -20,7 +20,14 @@ from awren_core.llm import LLMProvider
 from awren_core.models import BaseEntity, BaseEvent, BaseRelationship
 from awren_agents.base import AgentTask
 from awren_agents.research_agent import ResearchAgent
+from awren_agents.layer import OntologyAgentLayer
 from awren_core.schemas import (
+    AgentDefResponse,
+    AgentListResponse,
+    AgentRunRequest,
+    AgentRunResponse,
+    AgentTaskListResponse,
+    AgentTaskResponse,
     AgentQueryRequest,
     AgentQueryResponse,
     ChunkRequest,
@@ -1616,6 +1623,90 @@ async def get_action_detail(
     if not adef:
         raise HTTPException(status_code=404, detail=f"Action '{action_name}' not found for type '{type_name}'")
     return ActionDefResponse(**adef)
+
+
+# ---------------------------------------------------------------------------
+# Agent Runtime — Execute agents on ontology objects
+# ---------------------------------------------------------------------------
+
+_agent_layer_store: Optional[OntologyAgentLayer] = None
+
+
+def _get_agent_layer(
+    db: Session = Depends(get_db),
+    ontology: OntologyEngine = Depends(_get_ontology_engine),
+    actions: OntologyActionLayer = Depends(_get_action_layer),
+) -> OntologyAgentLayer:
+    global _agent_layer_store
+    if _agent_layer_store is None:
+        knowledge = KnowledgeEngine(db)
+        _agent_layer_store = OntologyAgentLayer.create_with_defaults(
+            ontology=ontology,
+            knowledge=knowledge,
+            actions=actions,
+        )
+    return _agent_layer_store
+
+
+@app.get("/api/v1/agents/tasks", response_model=AgentTaskListResponse, tags=["Agents"])
+async def list_agent_tasks(
+    agent_name: Optional[str] = Query(None, description="Filter by agent name"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    layer: OntologyAgentLayer = Depends(_get_agent_layer),
+) -> dict[str, Any]:
+    """List agent execution tasks."""
+    tasks = await layer.list_tasks(agent_name=agent_name, limit=limit, offset=offset)
+    return {"tasks": tasks, "total": len(tasks)}
+
+
+@app.get("/api/v1/agents/tasks/{task_id}", response_model=AgentTaskResponse, tags=["Agents"])
+async def get_agent_task(
+    task_id: str,
+    layer: OntologyAgentLayer = Depends(_get_agent_layer),
+) -> Optional[AgentTaskResponse]:
+    """Get details of a specific agent task."""
+    task = await layer.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
+    return AgentTaskResponse(**task)
+
+
+@app.get("/api/v1/agents", response_model=AgentListResponse, tags=["Agents"])
+async def list_agents(
+    layer: OntologyAgentLayer = Depends(_get_agent_layer),
+) -> dict[str, Any]:
+    """List all available agents."""
+    agents = await layer.list_agents()
+    return {"agents": agents, "total": len(agents)}
+
+
+@app.get("/api/v1/agents/{agent_name}", response_model=AgentDefResponse, tags=["Agents"])
+async def get_agent_detail(
+    agent_name: str,
+    layer: OntologyAgentLayer = Depends(_get_agent_layer),
+) -> Optional[AgentDefResponse]:
+    """Get details of a specific agent."""
+    adef = await layer.get_agent(agent_name)
+    if not adef:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_name}' not found")
+    return AgentDefResponse(**adef)
+
+
+@app.post("/api/v1/agents/{agent_name}/run", response_model=AgentRunResponse, tags=["Agents"])
+async def run_agent(
+    agent_name: str,
+    payload: AgentRunRequest,
+    current_user: UserModel = Depends(require_permission("actions", "execute")),
+    layer: OntologyAgentLayer = Depends(_get_agent_layer),
+) -> AgentRunResponse:
+    """Run an agent with the given input."""
+    result = await layer.run_agent(
+        agent_name=agent_name,
+        input=payload.input,
+        user=current_user,
+    )
+    return AgentRunResponse(**result)
 
 
 # ---------------------------------------------------------------------------

@@ -555,3 +555,54 @@ class ActionExecuteResponse(BaseModel):
 class ActionListResponse(BaseModel):
     actions: list[ActionDefResponse]
     total: int
+
+
+# ---------------------------------------------------------------------------
+# Agent schemas
+# ---------------------------------------------------------------------------
+
+
+class AgentDefResponse(BaseModel):
+    name: str
+    description: str
+    input_schema: dict[str, Any] = {}
+    output_schema: dict[str, Any] = {}
+    tags: list[str] = []
+    timeout_seconds: int = 300
+
+
+class AgentListResponse(BaseModel):
+    agents: list[AgentDefResponse]
+    total: int
+
+
+class AgentRunRequest(BaseModel):
+    input: dict[str, Any] = {}
+
+
+class AgentTaskResponse(BaseModel):
+    id: str
+    agent_name: str
+    status: str
+    input: dict[str, Any] = {}
+    output: Optional[dict[str, Any]] = None
+    error: Optional[str] = None
+    created_by: Optional[str] = None
+    created_at: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    elapsed_ms: float = 0.0
+
+
+class AgentRunResponse(BaseModel):
+    success: bool
+    task_id: str
+    agent_name: str
+    output: dict[str, Any] = {}
+    error: Optional[str] = None
+    elapsed_ms: float = 0.0
+
+
+class AgentTaskListResponse(BaseModel):
+    tasks: list[AgentTaskResponse]
+    total: int
