@@ -31,6 +31,9 @@ class BaseEntity(BaseModel):
     description: Optional[str] = None
     properties: dict[str, Any] = Field(default_factory=dict)
     identifiers: list[dict[str, str]] = Field(default_factory=list)
+    state: Optional[str] = None
+    version_num: int = 1
+    provenance: Optional[dict[str, Any]] = None
     metadata: dict[str, Any] = Field(default_factory=lambda: {
         "created": _utc_now(),
         "updated": _utc_now(),

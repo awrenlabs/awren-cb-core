@@ -65,7 +65,7 @@
     {
       "name": "qdrant",
       "type": "custom",
-      "image": "qdrant/qdrant:v1.12",
+      "image": "qdrant/qdrant:v1.18.2",
       "volumes": [
         {
           "name": "qdrantdata",

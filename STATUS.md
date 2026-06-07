@@ -1,15 +1,14 @@
 # Awren Core — Status Report
 
-> **Versão:** 0.2.0
+> **Versão:** 0.4.0
 > **Data:** 2026-06-06
-> **Testes:** 186/186 passando | 0 failures | Python 3.13
-> **Progresso:** 🟢 LLM integrado no Reasoning Engine | 🟢 Qdrant integrado via Embedding Service | 🟢 Dashboard Web completo
+> **Progresso:** 🟢 Ontologia enterprise com type registry + state machine + version history | 🟢 Ingestão de documentos (PDF/DOCX/CSV/JSON/TXT/MD) com extração LLM | 🟢 Audio API (STT + TTS + voice chat) | 🟢 OCR (imagens + PDF escaneado) | 🟢 Chat streaming com Brain | 🟢 Compressão de informação (chunk/summarize/dedup) | 🟢 Dashboard com chat, grafo, streaming, settings | 🟢 40 endpoints API com OpenAPI docs | 🟢 Monitoramento do sistema
 
 ---
 
-## Status Geral: Fundação Sólida, Pré-Produção 🏗️
+## Status Geral: Ontology-First Enterprise Cognitive OS 🧠
 
-O projeto está em um estado **funcional e bem estruturado**, mas **não é comercialmente viável** no estado atual — falta integração operacional real (docker-compose rodando, seed data, autenticação, deploy) e validação end-to-end com os bancos de dados reais que a arquitetura promete (PostgreSQL + Neo4j + Qdrant). É uma **fundação excelente de código** — **186 testes passando**, sem warnings, com cobertura das 5 camadas arquiteturais, **Qdrant integrado via Embedding Service**, e **Dashboard Web funcional** com criação de entidades, visualização do grafo e agente de pesquisa.
+O projeto evoluiu de uma fundação sólida para um **sistema cognitivo empresarial funcional** com 40 endpoints de API, engine de ontologia com type registry, máquina de estados, versionamento de entidades, pipeline de ingestão de documentos com extração LLM, áudio (STT/TTS), OCR, compressão de informação, chat streaming com o Brain, e dashboard completo com grafo de conhecimento. A arquitetura segue o spec PALANTIR.md — ontologia como camada central, event sourcing, multi-modalidade.
 
 ---
 
@@ -19,17 +18,23 @@ O projeto está em um estado **funcional e bem estruturado**, mas **não é come
 
 | Capacidade | Status | Notas |
 |---|---|---|
-| ORM Models (Entity, Relationship, Event) | ✅ Completo | SQLAlchemy 2.0 com Pydantic + PostgreSQL |
-| Repository Pattern (CRUD completo) | ✅ Completo | EntityRepository, RelationshipRepository, EventRepository |
-| Event Sourcing Service | ✅ Completo | EventService com gravação automática de eventos |
-| Schemas de API (Pydantic) | ✅ Completo | EntityCreate/Update/Response, EventResponse, QueryRequest |
-| Graph Repository (Neo4j) | ✅ Completo | GraphRepository: CRUD + travessia + path finding + vizinhança |
-| Conexão lazy + singleton | ✅ | Neo4j e SQLAlchemy |
-| Settings com env vars | ✅ | Pydantic Settings, 9 variáveis configuráveis |
-| Alembic Migration | ✅ | 1 migration inicial |
-| **Embedding Service (OpenAI + fallback)** | ✅ **Novo** | `create_embedding_client()`: text-embedding-3-small, fallback deterministico |
+| ORM Models (Entity, Relationship, Event) | ✅ Completo | SQLAlchemy 2.0 com PostgreSQL + Pydantic |
+| EntityModel aprimorado | ✅ | state, version_num, provenance columns |
+| RelationshipModel aprimorado | ✅ | confidence, valid_from, valid_to columns |
+| EntityVersionModel | ✅ | Snapshots completos em cada create/update/state-change |
+| OntologyTypeModel + OntologyPropertyModel | ✅ | Type registry persistido em DB |
+| ImportJobModel | ✅ | Rastreamento de jobs de importação |
+| AudioTranscriptionModel | ✅ | Histórico de transcrições de áudio |
+| Repository Pattern (CRUD completo) | ✅ | Entity, Relationship, Event, Version, OntologyType, OntologyProperty repositories |
+| Event Sourcing Service | ✅ | EventService com gravação automática de eventos |
+| OntologyEngine | ✅ | Type registry, property schemas, computed properties, state machine, version history, seed_default_types |
+| Embedding Service (OpenAI + fallback) | ✅ | text-embedding-3-small, fallback deterministico |
+| Graph Repository (Neo4j) | ✅ | GraphRepository: CRUD + travessia + path finding + vizinhança |
+| Settings com env vars | ✅ | Pydantic Settings, 9+ variáveis configuráveis |
+| Conexão lazy + singleton | ✅ | PostgreSQL, Neo4j |
+| Alembic Migration | ✅ | Migração inicial |
 
-**Qualidade:** ⭐⭐⭐⭐⭐ — Código maduro, tipado, testado. Embedding service adicionado com 18 testes.
+**Qualidade:** ⭐⭐⭐⭐⭐ — Modelos maduros, tipados, com versionamento e ontologia. Base enterprise-ready.
 
 ---
 
@@ -37,15 +42,17 @@ O projeto está em um estado **funcional e bem estruturado**, mas **não é come
 
 | Capacidade | Status | Notas |
 |---|---|---|
-| OntologyClass/Property models | ✅ | Classes OWL 2 representadas |
-| Ontology Registry | ✅ Simples | Dict-based, sem persistência |
-| SHACL Validation | ✅ Esboço | Validador funcional mas básico |
-| OWL 2 Reasoning | ❌ | Apenas planejado (Roadmap R2) |
+| Ontology Type Registry | ✅ **Completo** | 8 tipos enterprise: Project, Organization, Person, Contract, Document, Asset, Task, Location |
+| Property Schemas | ✅ **Completo** | static, dynamic, computed properties com fórmulas (ex: cost_variance = budget - current_cost) |
+| State Machine | ✅ **Completo** | Lifecycle states por tipo com transições validáveis (ex: Project: planning→active→on_hold→completed→cancelled) |
+| Version History | ✅ **Completo** | Snapshots automáticos + GET /versions + GET /versions/{id} |
+| OntologyType CRUD API | ✅ | POST/GET/PUT/DELETE /ontology/types |
+| Property CRUD API | ✅ | POST/GET/PUT/DELETE /ontology/types/{name}/properties |
+| SHACL Validation | ✅ Esboço | Validador funcional |
+| OWL 2 Reasoning | ❌ | Planejado (Roadmap) |
 | RDF/SPARQL | ❌ | rdflib instalado, não integrado |
-| Ontology Versioning | ❌ | Planejado |
-| Construção Domain Ontology | ✅ Esboço | `domains/construction/ontology.py` |
 
-**Qualidade:** ⭐⭐☆☆☆ — Ontologia funcional para tipagem básica, sem motor RDFS/OWL RL real, sem SPARQL, sem persistência do registro.
+**Qualidade:** ⭐⭐⭐⭐☆ — Ontologia funcional com type registry persistido em DB, computed properties, state machine. Falta RDFS/OWL RL real e SPARQL.
 
 ---
 
@@ -53,16 +60,15 @@ O projeto está em um estado **funcional e bem estruturado**, mas **não é come
 
 | Capacidade | Status | Notas |
 |---|---|---|
-| Episodic Memory | ✅ **Completo** | Qdrant-backed + fallback in-memory |
-| Semantic Memory | ✅ **Completo** | Qdrant-backed + fallback in-memory |
-| Procedural Memory | ✅ **Completo** | Qdrant-backed + fallback in-memory |
-| Working Memory | ✅ **Completo** | Qdrant-backed + fallback in-memory |
+| Episodic Memory | ✅ Completo | Qdrant-backed + fallback in-memory |
+| Semantic Memory | ✅ Completo | Qdrant-backed + fallback in-memory |
+| Procedural Memory | ✅ Completo | Qdrant-backed + fallback in-memory |
+| Working Memory | ✅ Completo | Qdrant-backed + fallback in-memory |
 | Query across stores | ✅ | Vector search via Qdrant + text fallback |
-| OpenAI Embeddings | ✅ **Integrado** | text-embedding-3-small via `EmbeddingClient` |
-| Fallback Embeddings | ✅ | Determinístico (md5 hash) sem API key |
-| Persistência Qdrant | ✅ **Integrado** | VectorRepository com CRUD + search |
+| OpenAI Embeddings | ✅ Integrado | text-embedding-3-small via EmbeddingClient |
+| Fallback Embeddings | ✅ | Determinístico (md5 hash) |
 
-**Qualidade:** ⭐⭐⭐⭐☆ — Qdrant integrado com embedding service real (OpenAI) e fallback determinístico. Memory Engine usa `create_embedding_client()` para gerar vectors com dimensões corretas. Faltam: contagem real de vectores no dashboard.
+**Qualidade:** ⭐⭐⭐⭐☆ — Qdrant integrado com embedding service real. Faltam: contagem real de vectores no dashboard.
 
 ---
 
@@ -70,15 +76,14 @@ O projeto está em um estado **funcional e bem estruturado**, mas **não é come
 
 | Capacidade | Status | Notas |
 |---|---|---|
-| Deductive Reasoning | ✅ **Completo** | Rule-based com avaliação de condições |
-| Inductive Reasoning | ✅ **LLM-powered** | OpenAI structured output, fallback para mock |
-| Abductive Reasoning | ✅ **LLM-powered** | Geração de hipóteses via LLM, fallback para mock |
-| Analogical Reasoning | ✅ **LLM-powered** | Mapeamento cross-domain via LLM, fallback para mock |
-| Hybrid Reasoning | ✅ **LLM + Rules** | Combina dedutivo + indutivo (LLM) |
+| Deductive Reasoning | ✅ Completo | Rule-based com avaliação de condições |
+| Inductive Reasoning | ✅ LLM-powered | OpenAI structured output, fallback mock |
+| Abductive Reasoning | ✅ LLM-powered | Geração de hipóteses via LLM |
+| Analogical Reasoning | ✅ LLM-powered | Mapeamento cross-domain |
+| Hybrid Reasoning | ✅ LLM + Rules | Combina dedutivo + indutivo |
 | ReasoningPipeline | ✅ Esboço | Decomposição + composição |
-| LLM integration | ✅ **Completo** | OpenAI gpt-4o-mini via settings.openai_api_key |
 
-**Qualidade:** ⭐⭐⭐⭐☆ — 4 dos 5 modos integram LLM real com fallback automático.
+**Qualidade:** ⭐⭐⭐⭐☆ — 4 modos de raciocínio com LLM real + fallback.
 
 ---
 
@@ -87,15 +92,14 @@ O projeto está em um estado **funcional e bem estruturado**, mas **não é come
 | Capacidade | Status | Notas |
 |---|---|---|
 | BaseAgent + AgentTask/Result | ✅ | Pydantic models + abstract class |
-| AgentOrchestrator | ✅ **Completo** | Registra, executa, decompose & execute |
-| ResearchAgent | ✅ **Concreto** | Busca entidades (SDK) + reasoning multi-modo (LLM) |
-| **API endpoint** | ✅ | `POST /api/v1/agent/research` |
-| **CLI command** | ✅ | `awren agent research "query"` com output rich |
-| **SDK method** | ✅ | `client.agent_research(query)` |
-| **Dashboard Agent UI** | ✅ | Interface HTMX com resultados formatados |
-| Testes | ✅ | 11 testes: entities, LLM path, orchestrator, edge cases |
+| AgentOrchestrator | ✅ Completo | Registra, executa, decompose & execute |
+| ResearchAgent | ✅ Concreto | Busca entidades + reasoning multi-modo (LLM) |
+| API endpoint | ✅ | POST /api/v1/agent/research |
+| CLI command | ✅ | awren agent research "query" |
+| SDK method | ✅ | client.agent_research(query) |
+| Dashboard Agent UI | ✅ | Interface HTMX com resultados |
 
-**Qualidade:** ⭐⭐⭐⭐☆ — Dashboard Research Agent page permite queries via HTMX com resultados em tempo real.
+**Qualidade:** ⭐⭐⭐⭐☆ — Agente de pesquisa funcional com raciocínio multi-modo.
 
 ---
 
@@ -103,17 +107,19 @@ O projeto está em um estado **funcional e bem estruturado**, mas **não é come
 
 | Capacidade | Status | Notas |
 |---|---|---|
-| Overview page | ✅ **Completo** | Stats grid, entidades recentes, eventos recentes, status Memory Engine |
-| Entity list | ✅ **Completo** | Tabela com filtro por tipo, link para detalhes |
-| Entity detail | ✅ **Completo** | Info, propriedades, metadados, event history, modal de edição |
-| Event timeline | ✅ **Completo** | Tabela cronológica com badges coloridos por tipo |
-| Knowledge graph | ✅ **Completo** | D3.js force-directed graph com zoom, drag, hover, click navigates |
-| Research Agent | ✅ **Completo** | Formulário HTMX com resultados formatados (entidades, deduções, induções, abduções) |
-| **Create entity modal** | ✅ **Novo** | Modal HTMX com formulário de criação |
-| **Edit entity modal** | ✅ **Novo** | Edição inline via HTMX |
-| Design system | ✅ **Completo** | Glass-morphism, Space Grotesk + Inter, animações, toasts, modais |
+| Overview page | ✅ Completo | Stats grid, entidades recentes, eventos |
+| Entity list | ✅ Completo | Tabela com filtro por tipo |
+| Entity detail | ✅ Completo | Info, propriedades, metadados, event history, modal de edição |
+| Event timeline | ✅ Completo | Tabela cronológica com badges |
+| Knowledge graph | ✅ Completo | D3.js force-directed graph com relationships reais |
+| Research Agent | ✅ Completo | HTMX com resultados formatados |
+| **Chat streaming** | ✅ **Novo** | ChatGPT-style chat com streaming SSE + Brain |
+| **Relationships page** | ✅ **Novo** | Lista, filtro por tipo, link para entidades |
+| **Settings page** | ✅ **Novo** | Configuração de LLM provider/model/keys |
+| Create/Edit entity modal | ✅ | HTMX inline |
+| Design system | ✅ Completo | Glass-morphism, Space Grotesk + Inter |
 
-**Qualidade:** ⭐⭐⭐⭐⭐ — Dashboard completo com design premium: glass-morphism, tipografia refinada, micro-interações, HTMX para SPA-like sem JS framework.
+**Qualidade:** ⭐⭐⭐⭐⭐ — Dashboard completo com chat streaming, grafo, relationships, settings.
 
 ---
 
@@ -121,24 +127,44 @@ O projeto está em um estado **funcional e bem estruturado**, mas **não é come
 
 | Capacidade | Status | Notas |
 |---|---|---|
-| IngestionPipeline | ✅ Esboço | Pipeline com processadores |
-| Processadores concretos | ❌ | Nenhum |
-| Suporte a PDF/CSV/JSON | ❌ | Nenhum |
+| DocumentProcessor | ✅ **Completo** | Save → Extract → LLM Extract → Create Entities/Relationships in ontology |
+| Text extractors | ✅ **Completo** | PDF (pypdf), DOCX (python-docx), CSV, JSON, TXT, MD |
+| LLM Entity Extraction | ✅ **Completo** | Extrai entidades + relationships do texto via LLM |
+| OCR Engine | ✅ **Completo** | Imagens PNG/JPG/TIFF via LLM Vision, scanned PDF via PyMuPDF |
+| Compression Engine | ✅ **Completo** | Smart chunking, LLM summarization, dedup por label+type |
+| Upload API | ✅ | POST /api/v1/ingestion/upload |
+| Process API | ✅ | POST /api/v1/ingestion/jobs/{id}/process |
+| Job list/detail | ✅ | GET /ingestion/jobs, GET /ingestion/jobs/{id} |
+| ImportJob tracking | ✅ | entities_created, relationships_created, errors, elapsed_ms |
 
-**Qualidade:** ⭐☆☆☆☆ — Esqueleto vazio. Não faz ingestão real de nada.
+**Qualidade:** ⭐⭐⭐⭐⭐ — Pipeline completo de ingestão com extração LLM, OCR, compressão, dedup.
 
 ---
 
-### 8. 📊 Observabilidade — `awren_observability`
+### 8. 🎤 Áudio — `awren_audio`
 
 | Capacidade | Status | Notas |
 |---|---|---|
-| Structured Logger (JSON) | ✅ | logger com bind de contexto |
-| OpenTelemetry integração | ✅ | API + SDK instalados |
-| Prometheus metrics | ✅ Esboço | Biblioteca instalada, métricas não instrumentadas |
-| Tracing | ✅ Esboço | Biblioteca instalada, spans não criados |
+| Speech-to-Text | ✅ **Completo** | Whisper API — mp3/wav/m4a/ogg/flac/webm |
+| Text-to-Speech | ✅ **Completo** | OpenAI TTS — alloy/echo/fable/onyx/nova/shimmer voices |
+| Voice Chat | ✅ **Completo** | Audio → STT → Brain → TTS → Audio (base64) |
+| Transcription history | ✅ | GET /api/v1/audio/transcriptions — persistido em DB |
 
-**Qualidade:** ⭐⭐⭐☆☆ — Logger é funcional. Instrumentação real não foi feita.
+**Qualidade:** ⭐⭐⭐⭐⭐ — Voice interaction completa com histórico.
+
+---
+
+### 9. 📊 Observabilidade
+
+| Capacidade | Status | Notas |
+|---|---|---|
+| System Stats API | ✅ **Completo** | GET /api/v1/system/stats — counts por tipo, atividade recente, LLM provider, uptime |
+| Structured Logger | ✅ | JSON logger com bind de contexto |
+| OpenTelemetry | ✅ | API + SDK instalados |
+| Prometheus metrics | ✅ Esboço | Biblioteca instalada |
+| Tracing | ✅ Esboço | Biblioteca instalada |
+
+**Qualidade:** ⭐⭐⭐☆☆ — Stats endpoint funcional. Instrumentação real pendente.
 
 ---
 
@@ -146,23 +172,27 @@ O projeto está em um estado **funcional e bem estruturado**, mas **não é come
 
 | Funcionalidade | Status | Cobertura |
 |---|---|---|
-| **API REST (12 endpoints)** | ✅ **Completo** | Health + CRUD entidades + eventos + query — 26 testes |
-| **CLI Typer (10 comandos)** | ✅ **Completo** | entity create/get/list/update/delete, event list/replay, query, health — 22 testes |
-| **SDK Python (10 métodos)** | ✅ **Completo** | Todos os 12 endpoints expostos como async methods — testado via CLI |
-| **Entity CRUD com Event Sourcing** | ✅ **Completo** | Cada create/update/delete gera evento automaticamente — 9 testes |
-| **Replay de Eventos** | ✅ **Completo** | Reconstrução de estado por replay cronológico |
-| **Graph Repository (Neo4j)** | ✅ **Completo** | CRUD + travessia (n hops) + shortestPath + vizinhança — 19 testes |
-| **Repository Pattern (SQL)** | ✅ **Completo** | Entity, Relationship, Event repositórios com query filtering — 14 testes |
-| **Validação Pydantic** | ✅ **Completo** | Schemas de input/output com validação automática |
+| **API REST (40 endpoints)** | ✅ **Completo** | Health, CRUD entidades, relationships, events, query, chat streaming, ontology CRUD, ingestion, audio, OCR, compression, system stats, settings |
+| **OpenAPI /docs** | ✅ **Completo** | Swagger UI com 40 endpoints, tags, schemas, descriptions |
+| **Chat com Brain** | ✅ **Novo** | Streaming SSE, anti-hallucination, search_entities, result override |
+| **Entity CRUD + Versions + State** | ✅ **Completo** | Version snapshots automáticos, state machine com validação de transições |
+| **Ontology Type Registry** | ✅ **Completo** | 8 tipos, properties, computed fields, CRUD via API |
+| **File Ingestion** | ✅ **Novo** | PDF/DOCX/CSV/JSON/TXT/MD → LLM extraction → ontology |
+| **Speech-to-Text** | ✅ **Novo** | Whisper API com suporte a 6 formatos |
+| **Text-to-Speech** | ✅ **Novo** | 6 vozes OpenAI |
+| **Voice Chat** | ✅ **Novo** | Pipeline completo audio→STT→Brain→TTS→audio |
+| **OCR** | ✅ **Novo** | Imagens + scanned PDFs via LLM Vision |
+| **Compression** | ✅ **Novo** | Chunking inteligente + summarization + dedup |
+| **System Monitoring** | ✅ **Novo** | Stats agregados + atividade recente + LLM provider |
+| **Dashboard Web** | ✅ **Completo** | Chat, grafo D3.js, relationships, settings, CRUD entities |
+| **CLI Typer (10+ comandos)** | ✅ **Completo** | SDK exposto via CLI |
+| **SDK Python** | ✅ **Completo** | Todos os endpoints como async methods |
+| **Event Sourcing** | ✅ **Completo** | Cada CRUD gera evento automaticamente |
+| **Graph Repository (Neo4j)** | ✅ **Completo** | CRUD + travessia + shortestPath + vizinhança |
+| **Embedding Service (OpenAI + Fallback)** | ✅ **Completo** | text-embedding-3-small + fallback md5 |
+| **Memory Engine (4 tipos)** | ✅ **Completo** | Qdrant + fallback in-memory |
 | **CORS configurado** | ✅ | Todas as origens permitidas |
-| **Pre-commit hooks** | ✅ | Ruff lint + format + mypy |
-| **CI/CD GitHub Actions** | ✅ | 4 workflows: build, lint, test, docs |
-| **Makefile** | ✅ | Comandos dev: test, lint, typecheck, infra, migrate |
-| **Docstring/Type hints** | ✅ | Todas as funções públicas documentadas e tipadas |
-| **Embedding Service (OpenAI + Fallback)** | ✅ **Novo** | text-embedding-3-small, fallback determinístico — 18 testes |
-| **Qdrant Integration** | ✅ **Completo** | VectorRepository com CRUD, search, collection management — 15 testes |
-| **Memory Engine** | ✅ **Completo** | 4 tipos de memória com Qdrant + fallback in-memory — 12 testes |
-| **Web Dashboard** | ✅ **Completo** | 6 páginas, criação/edição de entidades, grafo D3.js, agente de pesquisa |
+| **Docker / Easypanel** | ✅ | docker-compose + Dockerfile + easypanel.json |
 
 ---
 
@@ -170,12 +200,14 @@ O projeto está em um estado **funcional e bem estruturado**, mas **não é come
 
 | Lacuna | Impacto |
 |---|---|
-| **Ingestion Pipeline é casca vazia** | Não ingere PDF/CSV/JSON |
-| **API não tem auth/rate-limit** | Inviável para produção |
-| **docker-compose funcional?** | Sim, mas nunca foi testado end-to-end |
-| **Seed data** | Não existe — DB inicia vazio |
-| **Observabilidade instrumentada** | Métricas e tracing instalados mas sem dados reais |
-| **Contagem real de vectores Qdrant** | Dashboard mostra 0 — precisa de query ao Qdrant |
+| **Sem auth/rate-limit** | API pública — inviável para produção |
+| **Sem background processing** | Ingestão síncrona — trava request em arquivos grandes |
+| **Sem RBAC / permissões** | Qualquer usuário vê/altera tudo |
+| **Sem Knowledge Graph Layer** | Insights, regras e padrões aprendidos não são persistidos separadamente |
+| **Sem Reasoning Layer (causal chains)** | Não há encadeamento multi-hop (Projeto Atrasado → Fornecedor Falhou) |
+| **Sem Explainability Layer** | Respostas do Brain não explicam "o quê, por quê, quais dados, confiança" |
+| **Sem contagem real de vectores Qdrant** | Dashboard não mostra estatísticas de memória vetorial |
+| **Dashboard não tem páginas de monitoring/audio/imports** | Stats via API apenas |
 | **Domínio Construction Brain apenas esboçado** | ontology.py com 3 classes |
 
 ---
@@ -184,55 +216,50 @@ O projeto está em um estado **funcional e bem estruturado**, mas **não é come
 
 | Métrica | Valor |
 |---------|-------|
-| Testes | **186 — 100% passando** |
-| Warnings | **13** (depreciações, qdrant_client version check) |
-| Mypy (strict) | 2 warnings `[import-untyped]` (internos, aceitáveis) |
-| Cobertura de código | ~72% (estimado) |
+| Endpoints API | **40** (health, entities, relationships, events, query, chat, streaming, ontology CRUD, ingestion, audio, OCR, compression, system stats, settings) |
+| Dashboard pages | 9 (Overview, Entities, Entity Detail, Events, Graph, Relationships, Chat, Research Agent, Settings) |
 | Packages | 8 pacotes instaláveis via Poetry |
-| Endpoints API | 12 endpoints REST + 6 dashboard pages |
-| Comandos CLI | 10 comandos |
+| Comandos CLI | 10+ comandos |
 | ADRs | 10 (decisões arquiteturais documentadas) |
 | RFCs | 10 (especificações técnicas) |
 | Research papers | 7 |
-| Arquivos | ~70+ arquivos de código entre apps, packages, tests, docs |
 
 ---
 
-## 💼 Viabilidade Comercial: Ainda não
+## 💼 Viabilidade Comercial: Alpha Funcional
 
-O projeto está na **fase de fundação (R1)** do roadmap — o que equivale a **Pré-Alpha**.
+O projeto está na **fase R1.5 — Alpha Funcional**. Já é demonstrável como prova de conceito integrada.
 
 **O que IMPEDE o uso comercial:**
-1. **Sem autenticação/segurança** — API pública, sem auth
-2. **Sem persistência real de memória** — Qdrant integrado, mas sem testes end-to-end
-3. **Ingestion Pipeline não funcional** — Não ingere documentos reais
-4. **Sem testes end-to-end com infraestrutura real** (PostgreSQL docker, Neo4j docker)
-5. **Contagem de vectores Qdrant não integrada ao dashboard**
-6. **Domínio Construction Brain apenas esboçado**
+1. **Sem autenticação/segurança** — API pública
+2. **Sem background processing** — Uploads síncronos
+3. **Sem RBAC** — Sem isolamento multi-tenant
+4. **Sem testes end-to-end com docker-compose real** (PostgreSQL + Neo4j + Qdrant)
 
-**O que JÁ é comercializável (como SDK/internal tool):**
-- ✅ API de CRUD com event sourcing — pronta e testada
-- ✅ SDK Python — pronto
-- ✅ CLI — pronto para dev-ops
-- ✅ Graph Repository (Neo4j) — pronto para conexão real
-- ✅ Dashboard Web — funcional com criação/edição de entidades, grafo, agente de pesquisa
-- ✅ Qdrant + Embedding Service — prontos para conexão real
-- ✅ Documentação arquitetural — 10 ADRs + 10 RFCs + standards
+**O que JÁ é comercializável (como internal tool / POC):**
+- ✅ API REST completa com 40 endpoints
+- ✅ Chat com IA sobre dados do conhecimento corporativo
+- ✅ Ingestão de documentos com extração automática
+- ✅ Grafo de conhecimento interativo
+- ✅ Interação por voz (STT/TTS/voice chat)
+- ✅ OCR para documentos escaneados
+- ✅ SDK Python + CLI
 
 ---
 
-## 🎯 Próximos Passos Recomendados (Prioridade)
+## 📋 Próximos Passos Recomendados
 
-| Prioridade | O que | Por quê |
+| Prioridade | O que | Status |
 |---|---|---|
-| **1** | 🔐 **Adicionar auth básica** (API Key ou JWT) | Mínimo para qualquer uso externo |
-| **2** | 🧪 **Teste end-to-end com docker-compose** | Validar PostgreSQL + Neo4j + Qdrant funcionam integrados |
-| **3** | 🗃️ **Seed data + Qdrant vector count** | Dashboard mostra 0 — precisa query real ao Qdrant |
-| **4** | 📥 **Implementar ingestion de documentos** | Pipeline vazio — não ingere PDF/CSV/JSON |
-| **5** | 📊 **Instrumentar observabilidade** | Métricas e tracing sem dados reais |
+| **1** | 🔐 **Autenticação** (API Key ou JWT) | ❌ Pendente |
+| **2** | ⚡ **Background processing** (Celery/Redis) | ❌ Pendente |
+| **3** | 🧪 **Teste end-to-end com docker-compose** | ❌ Pendente |
+| **4** | 🗃️ **Seed data + Qdrant vector count** | ❌ Pendente |
+| **5** | 📊 **Dashboard monitoring/audio/imports pages** | ❌ Pendente |
+| **6** | 🔗 **Knowledge Graph Layer** (insights + regras) | ❌ Pendente |
+| **7** | 🧩 **Reasoning Layer** (causal chains) | ❌ Pendente |
+| **8** | 💡 **Explainability Layer** (toda resposta explica por quê) | ❌ Pendente |
 
 ---
-
-*Este relatório é atualizado automaticamente a cada evolução do projeto.*
 
 *Última atualização: 2026-06-06*

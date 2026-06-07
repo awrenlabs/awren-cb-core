@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Knowledge Graph{% endblock %}
-{% block heading %}Knowledge Graph{% endblock %}
+{% block page_title %}Knowledge Graph{% endblock %}
 
 {% block content %}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+
 <div class="page-heading">
     <div class="page-heading-text">
         <h2>Knowledge Graph</h2>
@@ -11,45 +13,32 @@
 </div>
 
 <div class="card" style="padding: 0; overflow: hidden;">
-    <!-- Graph toolbar -->
     <div style="display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--surface-border); flex-wrap: wrap;">
-        <span style="font-size: 12px; color: var(--text-tertiary);">Drag nodes to explore · Scroll to zoom</span>
+        <span style="font-size: 12px; color: var(--text-tertiary);">Drag nodes · Scroll to zoom · Click to inspect</span>
         <span id="nodeCount" style="font-size: 11px; color: var(--accent); margin-left: auto;"></span>
         <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="graphLegend"></div>
     </div>
-    <div class="graph-container" id="graph"></div>
+    <div class="graph-container" id="graph" style="min-height: 600px;"></div>
 </div>
 
 <script>
 const entities = {{ entities_json|safe }};
+const relationships = {{ relationships_json|safe }};
 
 if (entities.length === 0) {
-    document.getElementById('graph').innerHTML = '<div class="empty-state" style="padding: 100px 24px;"><div class="empty-icon">◉</div><h4>No entities to visualize</h4><p>Create entities first to see them in the knowledge graph.</p></div>';
+    document.getElementById('graph').innerHTML = '<div class="empty-state" style="padding:100px 24px;text-align:center;"><div class="empty-icon" style="font-size:40px;color:var(--text-tertiary);">◉</div><h4 style="margin:12px0 4px;">No entities to visualize</h4><p style="font-size:13px;color:var(--text-tertiary);">Create entities and relationships from the Chat or Entities page.</p></div>';
 } else {
-    // Generate connections based on type similarity
-    const links = [];
-    const typeGroups = {};
-    entities.forEach(e => {
-        if (!typeGroups[e.type]) typeGroups[e.type] = [];
-        typeGroups[e.type].push(e);
-    });
+    // Build links from actual relationships
+    const nodeMap = {};
+    entities.forEach(e => nodeMap[e.id] = e);
 
-    Object.values(typeGroups).forEach(group => {
-        for (let i = 1; i < group.length; i++) {
-            if (i <= 3) {
-                links.push({ source: group[i-1].id, target: group[i].id });
-            }
-        }
-    });
-
-    // Connect entities of different types that might be related (label similarity)
-    for (let i = 0; i < entities.length && links.length < entities.length * 0.5; i++) {
-        for (let j = i + 1; j < entities.length && links.length < entities.length * 0.5; j++) {
-            if (entities[i].type !== entities[j].type && Math.random() > 0.7) {
-                links.push({ source: entities[i].id, target: entities[j].id });
-            }
-        }
-    }
+    const links = relationships
+        .filter(r => nodeMap[r.source_id] && nodeMap[r.target_id])
+        .map(r => ({
+            source: r.source_id,
+            target: r.target_id,
+            type: r.type.split(':').pop()
+        }));
 
     // Color mapping
     const colorMap = {
@@ -63,7 +52,7 @@ if (entities.length === 0) {
     };
     const defaultColor = '#63628a';
 
-    // Build legend
+    // Legend
     const legend = document.getElementById('graphLegend');
     const seen = new Set();
     entities.forEach(e => {
@@ -76,7 +65,7 @@ if (entities.length === 0) {
         }
     });
 
-    // D3 Force-Directed Graph
+    // D3
     const container = document.getElementById('graph');
     const width = container.clientWidth || 900;
     const height = 600;
@@ -87,61 +76,72 @@ if (entities.length === 0) {
         .attr('height', height)
         .style('background', 'transparent');
 
-    // Zoom behavior
     const g = svg.append('g');
     svg.call(d3.zoom()
         .scaleExtent([0.1, 4])
         .on('zoom', (event) => { g.attr('transform', event.transform); })
     );
 
-    // Drop shadow filter
     const defs = svg.append('defs');
-    defs.append('filter')
-        .attr('id', 'node-shadow')
-        .append('feDropShadow')
-        .attr('dx', 0).attr('dy', 2).attr('stdDeviation', 4)
+    defs.append('filter').attr('id', 'node-shadow')
+        .append('feDropShadow').attr('dx', 0).attr('dy', 2).attr('stdDeviation', 4)
         .attr('flood-color', 'rgba(240, 160, 48, 0.15)');
 
-    const simulation = d3.forceSimulation(entities)
-        .force('link', d3.forceLink(links).id(d => d.id).distance(130).strength(0.25))
-        .force('charge', d3.forceManyBody().strength(-250))
-        .force('center', d3.forceCenter(width / 2, height / 2))
-        .force('collision', d3.forceCollide().radius(25));
+    // Arrow marker for directed relationships
+    defs.append('marker').attr('id', 'arrow').attr('viewBox', '0 0 10 10').attr('refX', 20).attr('refY', 5)
+        .attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto')
+        .append('path').attr('d', 'M 0 0 L 10 5 L 0 10 z').attr('fill', 'rgba(255,255,255,0.15)');
 
-    // Links
+    const simulation = d3.forceSimulation(entities)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(150).strength(0.3))
+        .force('charge', d3.forceManyBody().strength(-300))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(30));
+
+    // Links with arrows
     const link = g.append('g')
         .selectAll('line')
         .data(links)
         .join('line')
-        .attr('stroke', 'rgba(255,255,255,0.06)')
-        .attr('stroke-width', 1)
-        .attr('stroke-opacity', 0.4);
+        .attr('stroke', 'rgba(255,255,255,0.08)')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-opacity', 0.5)
+        .attr('marker-end', links.length > 0 ? 'url(#arrow)' : null);
+
+    // Link labels (relationship type)
+    const linkLabels = g.append('g')
+        .selectAll('text')
+        .data(links)
+        .join('text')
+        .text(d => d.type)
+        .attr('font-size', '8px')
+        .attr('fill', 'rgba(255,255,255,0.15)')
+        .attr('text-anchor', 'middle')
+        .attr('dy', -6)
+        .attr('pointer-events', 'none');
 
     // Nodes
     const node = g.append('g')
         .selectAll('g')
         .data(entities)
         .join('g')
-        .style('cursor', 'grab')
+        .style('cursor', 'pointer')
         .call(d3.drag()
             .on('start', (event, d) => {
                 if (!event.active) simulation.alphaTarget(0.3).restart();
                 d.fx = d.x; d.fy = d.y;
-                event.sourceEvent.target.style.cursor = 'grabbing';
             })
             .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
             .on('end', (event, d) => {
                 if (!event.active) simulation.alphaTarget(0);
                 d.fx = null; d.fy = null;
-                event.sourceEvent.target.style.cursor = 'grab';
             })
         );
 
-    // Node circles
     const circles = node.append('circle')
         .attr('r', d => {
             const count = links.filter(l => l.source.id === d.id || l.target.id === d.id).length;
-            return Math.max(5, Math.min(16, 5 + count * 2));
+            return Math.max(6, Math.min(18, 6 + count * 2));
         })
         .attr('fill', d => colorMap[d.type] || defaultColor)
         .attr('filter', 'url(#node-shadow)')
@@ -149,12 +149,11 @@ if (entities.length === 0) {
         .attr('stroke', 'rgba(255,255,255,0.08)')
         .attr('stroke-width', 1);
 
-    // Node labels
     node.append('text')
         .text(d => d.label.length > 14 ? d.label.slice(0, 13) + '…' : d.label)
         .attr('x', d => {
             const count = links.filter(l => l.source.id === d.id || l.target.id === d.id).length;
-            return Math.max(8, 5 + count * 2);
+            return Math.max(10, 6 + count * 2);
         })
         .attr('y', 4)
         .attr('fill', '#9897b0')
@@ -163,20 +162,18 @@ if (entities.length === 0) {
         .attr('font-weight', '500')
         .attr('pointer-events', 'none');
 
-    // Tooltip on hover
-    node.append('title')
-        .text(d => `${d.label} (${d.type})`);
+    node.append('title').text(d => `${d.label} (${d.type})`);
 
-    // Highlight on hover
+    // Hover
     node.on('mouseenter', function(event, d) {
         circles.filter(c => c.id === d.id).attr('opacity', 1).attr('r', function() {
             const count = links.filter(l => l.source.id === d.id || l.target.id === d.id).length;
-            return Math.max(8, 5 + count * 2) + 2;
+            return Math.max(9, 6 + count * 2) + 2;
         });
     }).on('mouseleave', function(event, d) {
         circles.filter(c => c.id === d.id).attr('opacity', 0.85).attr('r', function() {
             const count = links.filter(l => l.source.id === d.id || l.target.id === d.id).length;
-            return Math.max(5, Math.min(16, 5 + count * 2));
+            return Math.max(6, Math.min(18, 6 + count * 2));
         });
     });
 
@@ -192,12 +189,15 @@ if (entities.length === 0) {
             .attr('x2', d => d.target.x)
             .attr('y2', d => d.target.y);
 
+        linkLabels
+            .attr('x', d => (d.source.x + d.target.x) / 2)
+            .attr('y', d => (d.source.y + d.target.y) / 2);
+
         node.attr('transform', d => `translate(${d.x},${d.y})`);
     });
 
-    const nodeCount = entities.length;
-    const edgeCount = links.length;
-    document.getElementById('nodeCount').textContent = `${nodeCount} node${nodeCount !== 1 ? 's' : ''} · ${edgeCount} edge${edgeCount !== 1 ? 's' : ''}`;
+    document.getElementById('nodeCount').textContent =
+        `${entities.length} node${entities.length !== 1 ? 's' : ''} · ${links.length} edge${links.length !== 1 ? 's' : ''}`;
 }
 </script>
 {% endblock %}

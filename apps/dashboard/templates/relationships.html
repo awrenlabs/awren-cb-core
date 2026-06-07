@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Relationships — Awren Core{% endblock %}
+{% block page_title %}Relationships{% endblock %}
+{% block content %}
+<div style="max-width: 960px;">
+    <div class="flex items-center gap-3" style="margin-bottom: var(--sp-5);">
+        <h2 style="font-size: var(--text-xl); font-weight: var(--weight-semibold); letter-spacing: -0.3px;">↔ Relationships</h2>
+        <button class="btn-primary btn-sm" onclick="document.getElementById('createRelModal').classList.add('show')">+ New Relationship</button>
+    </div>
+
+    <div class="card">
+        {% if relationships %}
+        <div class="table-wrap" style="overflow-x: auto;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Source</th>
+                        <th>Target</th>
+                        <th>Confidence</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in relationships %}
+                    <tr>
+                        <td><span class="badge badge-purple">{{ r.type }}</span></td>
+                        <td class="id-cell" title="{{ r.source_id }}">{{ r.source_id[:8] }}...</td>
+                        <td class="id-cell" title="{{ r.target_id }}">{{ r.target_id[:8] }}...</td>
+                        <td><span class="badge">{{ r.metadata.get('confidence', 1.0) }}</span></td>
+                        <td>
+                            <button class="btn btn-xs btn-secondary"
+                                    hx-delete="/dashboard/api/relationships/{{ r.id }}"
+                                    hx-trigger="click"
+                                    hx-target="#toasts"
+                                    hx-swap="innerHTML"
+                                    hx-confirm="Delete this relationship?">Delete</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">↔</div>
+            <h4>No relationships yet</h4>
+            <p>Create relationships to connect entities in the knowledge graph.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Create Relationship Modal -->
+<div class="modal-overlay" id="createRelModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>↔ New Relationship</h3>
+            <button class="modal-close" onclick="this.closest('.modal-overlay').classList.remove('show')">✕</button>
+        </div>
+        <form hx-post="/dashboard/api/relationships" hx-target="#toasts" hx-swap="innerHTML"
+              hx-on::after-request="if(event.detail.successful) { document.getElementById('createRelModal').classList.remove('show'); setTimeout(() => window.location.reload(), 500); }">
+            <div class="form-group">
+                <label for="rel-type">Relationship Type</label>
+                <select id="rel-type" name="type" class="form-select" required>
+                    <option value="">Select type...</option>
+                    <option value="core:owns">Owns</option>
+                    <option value="core:employs">Employs</option>
+                    <option value="core:participatesIn">Participates In</option>
+                    <option value="core:locatedAt">Located At</option>
+                    <option value="core:produces">Produces</option>
+                    <option value="core:investsIn">Invests In</option>
+                    <option value="core:regulates">Regulates</option>
+                    <option value="core:collaboratesWith">Collaborates With</option>
+                    <option value="core:derivedFrom">Derived From</option>
+                    <option value="core:references">References</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="rel-source">Source Entity</label>
+                <select id="rel-source" name="source_id" class="form-select" required>
+                    <option value="">Select source...</option>
+                    {% for e in entities %}
+                    <option value="{{ e.id }}">{{ e.label }} ({{ e.type }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="rel-target">Target Entity</label>
+                <select id="rel-target" name="target_id" class="form-select" required>
+                    <option value="">Select target...</option>
+                    {% for e in entities %}
+                    <option value="{{ e.id }}">{{ e.label }} ({{ e.type }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').classList.remove('show')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Relationship</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

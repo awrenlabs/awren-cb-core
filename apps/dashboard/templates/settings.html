@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Settings — Awren Core{% endblock %}
+{% block page_title %}Settings{% endblock %}
+{% block content %}
+<style>
+  .setting-section { margin-bottom: var(--sp-6); }
+  .setting-section + .setting-section { padding-top: var(--sp-6); border-top: 1px solid var(--border-subtle); }
+  .form-group { margin-bottom: var(--sp-4); }
+  .form-group label { display: block; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--text-secondary); margin-bottom: var(--sp-2); }
+  .toast-success { background: #0a3b2e !important; border: 1px solid #1a6b4e !important; padding: var(--sp-1) var(--sp-3); border-radius: var(--radius-md); font-size: var(--text-xs); }
+  .toast-error { background: #3b1a1a !important; border: 1px solid #6b2a2a !important; padding: var(--sp-1) var(--sp-3); border-radius: var(--radius-md); font-size: var(--text-xs); }
+</style>
+
+<div style="max-width: 680px;">
+
+  <div class="card setting-section">
+    <div class="card-header">
+      <h3>🤖 LLM Provider</h3>
+    </div>
+    <p style="font-size: var(--text-sm); color: var(--text-tertiary); margin-bottom: var(--sp-5);">
+      Configure the language model that powers the Company Brain. API keys are stored in the database — leave blank to keep the existing value.
+    </p>
+
+    <form id="llm-form"
+          hx-put="/dashboard/api/settings/llm"
+          hx-target="#settings-toast"
+          hx-swap="innerHTML"
+          hx-indicator="#save-indicator">
+
+      <div class="form-group">
+        <label for="provider">Provider</label>
+        <select id="provider" name="provider"
+                onchange="updateModelHint(this.value)"
+                style="width: 100%; padding: var(--sp-2) var(--sp-3); background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); color: var(--text-primary); font-size: var(--text-sm);">
+          {% for p in providers %}
+          <option value="{{ p.id }}" {% if p.id == current_provider %}selected{% endif %}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="model">Model <span style="color: var(--text-tertiary); font-weight: normal;">(type any model name)</span></label>
+        <input type="text" id="model" name="model"
+               value="{{ current_model }}"
+               placeholder="gpt-4o, claude-sonnet-4, custom-model..."
+               style="width: 100%; padding: var(--sp-2) var(--sp-3); background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); color: var(--text-primary); font-size: var(--text-sm);">
+        <div id="model-hint" style="font-size: var(--text-xs); color: var(--text-tertiary); margin-top: 4px;"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="openai_api_key">OpenAI API Key <span style="color: var(--text-tertiary); font-weight: normal;">(also used for OpenRouter / Custom)</span></label>
+        <input type="password" id="openai_api_key" name="openai_api_key"
+               value="{{ openai_api_key }}"
+               placeholder="sk-..."
+               style="width: 100%; padding: var(--sp-2) var(--sp-3); background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); color: var(--text-primary); font-size: var(--text-sm); font-family: monospace;">
+        <div style="font-size: var(--text-xs); color: var(--text-tertiary); margin-top: 4px;">
+          {% if has_openai_key %}🔑 Configured{% else %}⚪ Not configured{% endif %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="anthropic_api_key">Anthropic API Key</label>
+        <input type="password" id="anthropic_api_key" name="anthropic_api_key"
+               value="{{ anthropic_api_key }}"
+               placeholder="sk-ant-..."
+               style="width: 100%; padding: var(--sp-2) var(--sp-3); background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); color: var(--text-primary); font-size: var(--text-sm); font-family: monospace;">
+        <div style="font-size: var(--text-xs); color: var(--text-tertiary); margin-top: 4px;">
+          {% if has_anthropic_key %}🔑 Configured{% else %}⚪ Not configured{% endif %}
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3" style="margin-top: var(--sp-5);">
+        <button type="submit" class="btn btn-primary" style="height: 34px; padding: 0 var(--sp-4);">
+          <span id="save-indicator" class="htmx-indicator" style="margin-right: var(--sp-2);">⏳</span>
+          Save
+        </button>
+        <span id="settings-toast"></span>
+      </div>
+    </form>
+  </div>
+
+</div>
+
+<script>
+  const providers = {{ providers_json | safe }};
+
+  function updateModelHint(providerId) {
+    const hint = document.getElementById('model-hint');
+    const provider = providers.find(p => p.id === providerId);
+    if (provider && provider.models.length) {
+      const names = provider.models.map(m => m.id).join(', ');
+      hint.textContent = '💡 Suggested: ' + names;
+    } else {
+      hint.textContent = '';
+    }
+  }
+
+  // Set initial hint
+  updateModelHint(document.getElementById('provider').value);
+</script>
+{% endblock %}
