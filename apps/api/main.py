@@ -364,15 +364,16 @@ async def generate_api_key(
     import secrets
     import hashlib
     from datetime import timedelta
+    user = db.merge(current_user)
     api_key = f"awr_{secrets.token_hex(24)}"
-    current_user.api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    user.api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
     if payload.expires_days:
-        current_user.api_key_expires_at = datetime.now(timezone.utc) + timedelta(days=payload.expires_days)
+        user.api_key_expires_at = datetime.now(timezone.utc) + timedelta(days=payload.expires_days)
     db.flush()
     return APIKeyResponse(
         api_key=api_key,
         key_preview=api_key[:12] + "...",
-        expires_at=current_user.api_key_expires_at.isoformat() if current_user.api_key_expires_at else None,
+        expires_at=user.api_key_expires_at.isoformat() if user.api_key_expires_at else None,
     )
 
 
@@ -1180,10 +1181,10 @@ def _import_job_to_response(job: ImportJobModel) -> ImportJobResponse:
 # ---------------------------------------------------------------------------
 
 
-@app.get("/api/v1/system/stats", tags=["System"])
+@app.get("/api/v1/system/stats", response_model=SystemStatsResponse, tags=["System"])
 async def system_stats(
     db: Session = Depends(get_db),
-) -> dict[str, Any]:
+) -> SystemStatsResponse:
     """Get comprehensive system statistics for monitoring dashboard.
     
     Returns counts of entities, relationships, events, conversations, imports;

@@ -52,6 +52,9 @@ class KnowledgeEngine:
     ) -> dict[str, Any]:
         """Create a knowledge node (insight, rule, or pattern).
 
+        Avoids duplicates: if a node with the same (kind, label, source) exists,
+        returns the existing node instead of creating a new one.
+
         Args:
             kind: 'insight', 'rule', or 'pattern'
             label: Short human-readable name
@@ -62,6 +65,18 @@ class KnowledgeEngine:
             metadata: Additional structured data
             entity_ids: Related ontology entity IDs
         """
+        from sqlalchemy import and_, func
+        norm_label = label.strip().lower()
+        all_nodes = self._session.execute(
+            select(KnowledgeNodeModel).where(
+                KnowledgeNodeModel.kind == kind,
+                KnowledgeNodeModel.source == source,
+            )
+        ).scalars().all()
+        for existing in all_nodes:
+            if existing.label.strip().lower() == norm_label:
+                return self._node_to_dict(existing)
+
         node = KnowledgeNodeModel(
             id=uuid4(),
             kind=kind,
@@ -71,7 +86,7 @@ class KnowledgeEngine:
             confidence=confidence,
             tags=tags or [],
             metadata_=metadata or {},
-            entity_ids=entity_ids or [],
+            entity_ids=[str(eid) for eid in (entity_ids or [])],
         )
         self._session.add(node)
         self._session.flush()
@@ -273,20 +288,32 @@ class KnowledgeEngine:
         kinds: Optional[list[str]] = None,
         limit: int = 20,
     ) -> list[dict[str, Any]]:
-        """Search knowledge nodes by content similarity (basic text match)."""
-        stmt = select(KnowledgeNodeModel).order_by(
-            KnowledgeNodeModel.confidence.desc()
-        ).limit(limit)
+        """Search knowledge nodes by content similarity (basic text match).
+
+        Deduplicates by node ID in Python to handle repeated rows safely.
+        """
+        stmt = select(KnowledgeNodeModel)
 
         if kinds:
             stmt = stmt.where(KnowledgeNodeModel.kind.in_(kinds))
 
         results = self._session.execute(stmt).scalars().all()
 
-        # Simple relevance scoring — prefer label/content match
-        query_lower = query.lower()
-        scored = []
+        # Deduplicate by ID (safety: avoids issues with JSON columns + DISTINCT)
+        seen: dict[UUID, KnowledgeNodeModel] = {}
         for r in results:
+            if r.id not in seen:
+                seen[r.id] = r
+        unique = list(seen.values())
+
+        if not query.strip():
+            unique.sort(key=lambda r: r.created_at or datetime.min, reverse=True)
+            return [self._node_to_dict(r) for r in unique[:limit]]
+
+        # Simple relevance scoring -- prefer label/content match
+        query_lower = query.lower()
+        scored = {}
+        for r in unique:
             score = 0.0
             if query_lower in r.label.lower():
                 score += 0.5
@@ -294,10 +321,11 @@ class KnowledgeEngine:
                 score += 0.3
             if query_lower in " ".join(r.tags or []).lower():
                 score += 0.2
-            scored.append((score, r))
+            if score > 0:
+                scored[r.id] = (score, r)
 
-        scored.sort(key=lambda x: -x[0])
-        return [self._node_to_dict(r) for score, r in scored if score > 0][:limit]
+        sorted_nodes = sorted(scored.values(), key=lambda x: -x[0])
+        return [self._node_to_dict(r) for _, r in sorted_nodes[:limit]]
 
     # ------------------------------------------------------------------
     # Stats

@@ -13,6 +13,7 @@ from awren_core.llm import create_llm_client
 from awren_core.models import BaseEntity, BaseRelationship
 from awren_core.ontology.engine import OntologyEngine
 from awren_core.orm_models import ImportJobModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from awren_ingestion.extractors import extract_text
@@ -137,6 +138,57 @@ class DocumentProcessor:
                     result["errors"].append(f"Failed to create relationship '{rel.get('type', '?')}': {e}")
             elif source_label and target_label:
                 result["errors"].append(f"Could not resolve relationship: {source_label} → {target_label}")
+
+        # 6. Auto-generate knowledge nodes (insights/rules/patterns) from extracted text
+        try:
+            from awren_core.knowledge import KnowledgeEngine
+            from awren_core.orm_models import EntityModel, RelationshipModel
+            ke = KnowledgeEngine(self._session)
+            created_entities = []
+            for eid_str in result["entity_ids"]:
+                e = self._session.get(EntityModel, UUID(eid_str))
+                if e:
+                    created_entities.append(e)
+            knowledge_nodes = await ke.extract_insights_from_text(
+                text=raw_text[:12000],
+                source="ingestion",
+                max_insights=5,
+            )
+            if knowledge_nodes:
+                result["knowledge_nodes_created"] = len(knowledge_nodes)
+                for kn in knowledge_nodes:
+                    for e in created_entities[:10]:
+                        await ke.create_edge(
+                            source_id=UUID(kn["id"]),
+                            target_id=e.id,
+                            relationship_type="derives_from",
+                        )
+            if created_entities:
+                stmt = select(RelationshipModel).where(
+                    RelationshipModel.source_id.in_([e.id for e in created_entities])
+                )
+                entity_rels = self._session.execute(stmt).scalars().all()
+                rule_nodes = await ke.extract_rules_from_entities(
+                    entities=created_entities,
+                    relationships=list(entity_rels),
+                )
+                if rule_nodes:
+                    result["rules_created"] = len(rule_nodes)
+        except Exception as e:
+            logger.warning("Knowledge extraction failed: %s", e)
+            result["errors"].append(f"Knowledge extraction: {e}")
+
+        # 7. Auto-discover causal chains from new entities
+        try:
+            from awren_core.causality import CausalEngine
+            ce = CausalEngine(self._session)
+            entity_uuids = [UUID(eid_str) for eid_str in result["entity_ids"]]
+            chains = await ce.auto_discover_chains(entity_uuids, max_hops=4, max_chains=50)
+            if chains:
+                result["causal_chains_created"] = len(chains)
+        except Exception as e:
+            logger.warning("Causal discovery failed: %s", e)
+            result["errors"].append(f"Causal discovery: {e}")
 
         return result
 

@@ -124,7 +124,8 @@ class CausalEngine:
             return []
 
         # BFS traversal following causal relationships
-        causal_types = ["causes", "enables", "triggers", "leads_to", "produces", "results_in"]
+        causal_types = ["causes", "enables", "triggers", "leads_to", "produces", "results_in",
+                        "core:causes", "core:enables", "core:produces"]
         visited: set[UUID] = {entity_id}
         chain = [{"entity_id": str(entity_id), "entity_label": entity.label, "relationship": "start"}]
         queue: list[tuple[UUID, int]] = [(entity_id, 0)]
@@ -194,7 +195,8 @@ class CausalEngine:
         Traverses relationships backward to find root causes.
         """
         # Reverse: look for relationships that point TO this entity
-        causal_types = ["causes", "enables", "triggers", "leads_to", "produces", "results_in"]
+        causal_types = ["causes", "enables", "triggers", "leads_to", "produces", "results_in",
+                        "core:causes", "core:enables", "core:produces"]
 
         entity = self._session.get(EntityModel, entity_id)
         if not entity:
@@ -353,6 +355,68 @@ class CausalEngine:
 
         paths.sort(key=lambda x: x["hops"])
         return paths[:10]
+
+    async def auto_discover_chains(
+        self,
+        entity_ids: list[UUID],
+        max_hops: int = 4,
+        max_chains: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Auto-discover and record causal chains from entities.
+
+        Called automatically after ingestion to populate causal relationships.
+
+        Args:
+            entity_ids: Newly created entity IDs to analyze
+            max_hops: Maximum chain depth
+            max_chains: Maximum chains to record
+
+        Returns:
+            List of recorded chain dicts
+        """
+        recorded = []
+        for eid in entity_ids:
+            # Forward chains
+            chains = await self.forward_chain(eid, max_hops=max_hops, min_confidence=0.0)
+            for c in chains:
+                existing = self._session.execute(
+                    select(CausalChainModel).where(CausalChainModel.head_id == eid).limit(1)
+                ).first()
+                if existing:
+                    continue
+                chain = await self.record_chain(
+                    head_id=eid,
+                    chain=c["chain"],
+                    confidence=c["confidence"],
+                    source="ingestion_auto",
+                    metadata={"auto_discovered": True, "hop_count": c["hops"]},
+                )
+                recorded.append(chain)
+                if len(recorded) >= max_chains:
+                    return recorded
+
+            # Backward chains
+            chains = await self.backward_chain(eid, max_hops=max_hops, min_confidence=0.0)
+            for c in chains:
+                existing = self._session.execute(
+                    select(CausalChainModel).where(
+                        CausalChainModel.head_id == UUID(c["chain"][0]["entity_id"])
+                    ).limit(1)
+                ).first()
+                if existing:
+                    continue
+                chain = await self.record_chain(
+                    head_id=UUID(c["chain"][0]["entity_id"]),
+                    chain=c["chain"],
+                    confidence=c["confidence"],
+                    source="ingestion_auto",
+                    metadata={"auto_discovered": True, "hop_count": c["hops"]},
+                )
+                recorded.append(chain)
+                if len(recorded) >= max_chains:
+                    return recorded
+
+        return recorded
 
     def _parse_json_list(self, raw: str) -> list[dict]:
         import re
