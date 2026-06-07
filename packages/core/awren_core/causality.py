@@ -74,7 +74,7 @@ class CausalEngine:
         chain = self._session.get(CausalChainModel, chain_id)
         return self._chain_to_dict(chain) if chain else None
 
-    async def _chain_to_dict(self, chain: CausalChainModel) -> dict[str, Any]:
+    def _chain_to_dict(self, chain: CausalChainModel) -> dict[str, Any]:
         return {
             "id": str(chain.id),
             "head_id": str(chain.head_id),

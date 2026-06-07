@@ -233,6 +233,11 @@ DEFAULT_PERMISSIONS: list[dict[str, str]] = [
     {"role": "ingest", "resource": "ingestion", "action": "upload"},
     {"role": "ingest", "resource": "ingestion", "action": "process"},
     {"role": "ingest", "resource": "entities", "action": "read"},
+
+    # Action permissions
+    {"role": "operator", "resource": "actions", "action": "read"},
+    {"role": "operator", "resource": "actions", "action": "execute"},
+    {"role": "viewer", "resource": "actions", "action": "read"},
 ]
 
 

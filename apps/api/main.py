@@ -1571,6 +1571,7 @@ def _get_action_layer(
 @app.get("/api/v1/actions", response_model=ActionListResponse, tags=["Actions"])
 async def list_actions(
     type_name: Optional[str] = Query(None, description="Filter by ontology type"),
+    current_user: UserModel = Depends(require_permission("actions", "read")),
     layer: OntologyActionLayer = Depends(_get_action_layer),
 ) -> dict[str, Any]:
     """List all executable actions, optionally filtered by ontology type."""
@@ -1585,7 +1586,7 @@ async def list_actions(
 )
 async def execute_action(
     payload: ActionExecuteRequest,
-    current_user: UserModel = Depends(get_current_user),
+    current_user: UserModel = Depends(require_permission("actions", "execute")),
     layer: OntologyActionLayer = Depends(_get_action_layer),
 ) -> ActionExecuteResponse:
     """Execute an action on an ontology object."""
@@ -1607,6 +1608,7 @@ async def execute_action(
 async def get_action_detail(
     action_name: str,
     type_name: str = Query(..., description="Ontology type this action belongs to"),
+    current_user: UserModel = Depends(require_permission("actions", "read")),
     layer: OntologyActionLayer = Depends(_get_action_layer),
 ) -> Optional[ActionDefResponse]:
     """Get details of a specific action."""

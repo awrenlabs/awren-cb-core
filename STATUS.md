@@ -1,8 +1,8 @@
 # Awren Core — Status Report
 
-> **Versão:** 0.5.0
-> **Data:** 2026-06-06
-> **Progresso:** 🟢 Ontologia enterprise | 🟢 Ingestão de documentos | 🟢 Audio/OCR/Compressão | 🟢 Chat streaming | 🟢 **🔐 Autenticação JWT + API Key** | 🟢 **🔑 RBAC (roles/permissions)** | 🟢 **🧠 Knowledge Graph Layer (insights/rules/patterns)** | 🟢 **🔗 Causal Reasoning (forward/backward/LLM chains)** | 🟢 **💡 Explainability Layer (what/why/data/confidence)** | 🟢 **⚡ Background processing (Celery)** | 🟢 Dashboard completo | 🟢 55+ endpoints API
+> **Versão:** 0.6.0
+> **Data:** 2026-06-07
+> **Progresso:** 🟢 Ontologia enterprise | 🟢 Ingestão de documentos | 🟢 Audio/OCR/Compressão | 🟢 Chat streaming | 🟢 **🔐 Autenticação JWT + API Key** | 🟢 **🔑 RBAC (roles/permissions)** | 🟢 **🧠 Knowledge Graph Layer (insights/rules/patterns)** | 🟢 **🔗 Causal Reasoning (forward/backward/LLM chains)** | 🟢 **💡 Explainability Layer** | 🟢 **⚡ Background processing (Celery)** | 🟢 Dashboard completo | 🟢 59 endpoints API | 🟢 **⚡ Action Framework (Palantir-style)** | 🟢 **🔌 Layer Protocols (7 interfaces)** | 🟢 **Modular monorepo (9 pacotes)**
 
 ---
 
@@ -237,11 +237,15 @@ O projeto está na **fase R2 — Beta Controlado**. Pronto para deploy interno c
 **O que JÁ é comercializável (como internal tool / POC):**
 - ✅ **Autenticação JWT + API Key** — login, registro, tokens
 - ✅ **RBAC** — 4 roles (admin, operator, viewer, ingest) com permissions granulares
-- ✅ API REST completa com 55+ endpoints
+- ✅ API REST completa com 59 endpoints (0 com 500)
 - ✅ **Knowledge Graph Layer** — insights, regras, padrões extraídos via LLM
-- ✅ **Causal Reasoning** — forward/backward chains, LLM analysis, path finding
+- ✅ **Causal Reasoning** — forward/backward chains, LLM analysis, path finding, list chains
 - ✅ **Explainability** — toda resposta do chat explica what/why/data/confidence/assumptions
 - ✅ **Background processing** — Celery configurado (requer Redis)
+- ✅ **Action Framework** (Palantir-style) — 10 ações built-in para Project/Contract/Document/Asset
+- ✅ **Layer Protocols** — 7 interfaces plug-and-play (Ontology, Knowledge, Causal, Action, Explainability, Agent, Memory)
+- ✅ **Modular monorepo** — 9 pacotes independentes em `packages/`
+- ✅ **RBAC completo** — todos os endpoints de ação protegidos por roles/permissions
 - ✅ Chat com IA sobre dados do conhecimento corporativo
 - ✅ Ingestão de documentos com extração automática
 - ✅ Grafo de conhecimento interativo
@@ -257,10 +261,12 @@ O projeto está na **fase R2 — Beta Controlado**. Pronto para deploy interno c
 |---|---|---|
 | **1** | 🧪 **Teste end-to-end com docker-compose** (PostgreSQL + Neo4j + Qdrant + Redis) | ❌ Pendente |
 | **2** | 🗃️ **Seed data + Qdrant vector count no dashboard** | ❌ Pendente |
-| **3** | 📊 **Dashboard knowledge/causal/monitoring/audio/imports pages** | ❌ Pendente |
-| **4** | 🔐 **Rate limiting na API** | ❌ Pendente |
-| **5** | 🚀 **Deploy em produção** (Easypanel / Railway) | ❌ Pendente |
+| **3** | 📊 **Dashboard action/ontology/knowledge/causal/monitoring pages** | ❌ Pendente |
+| **4** | 🤖 **Agent Runtime layer** (agentes operando via ontologia) | ❌ Pendente |
+| **5** | 🧠 **Procedural + Strategic Memory layers** | ❌ Pendente |
+| **6** | 🔐 **Rate limiting na API** | ❌ Pendente |
+| **7** | 🚀 **Deploy em produção** (Easypanel / Railway) | ❌ Pendente |
 
 ---
 
-*Última atualização: 2026-06-06*
+*Última atualização: 2026-06-07*
