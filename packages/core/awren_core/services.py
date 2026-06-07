@@ -341,7 +341,7 @@ class EventService:
 
     async def chat(self, message: str, conversation_id: Optional[str] = None,
                    provider: Optional[str] = None, model: Optional[str] = None,
-                   temperature: float = 0.7) -> dict[str, Any]:
+                   temperature: float = 0.7, include_graph_context: bool = True) -> dict[str, Any]:
         """Chat with the Company Brain — persistent, with action execution."""
         from awren_core.orm_models import EntityModel
         from sqlalchemy import select

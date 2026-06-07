@@ -60,8 +60,74 @@ from awren_core.schemas import (
     VoiceChatResponse,
 )
 from awren_core.audio.engine import AudioEngine, is_supported_audio
+from awren_core.auth import (
+    create_access_token, get_current_user, get_optional_user,
+    hash_password, require_permission, require_role, seed_roles_and_permissions,
+    verify_password,
+)
+from awren_core.causality import CausalEngine
+from awren_core.explainability import ExplainabilityEngine, Explanation
+from awren_core.knowledge import KnowledgeEngine
 from awren_core.ontology.engine import OntologyEngine
-from awren_core.orm_models import AudioTranscriptionModel, ImportJobModel
+from awren_core.orm_models import (
+    AudioTranscriptionModel, ImportJobModel, KnowledgeNodeModel,
+    KnowledgeEdgeModel, CausalChainModel, UserModel,
+)
+from awren_core.schemas import (
+    APIKeyGenerateRequest,
+    APIKeyResponse,
+    AgentQueryRequest,
+    AgentQueryResponse,
+    CausalAnalysisRequest,
+    CausalChainResponse,
+    CausalPathRequest,
+    ChunkRequest,
+    ChunkResponse,
+    ChatRequest,
+    ChatResponse,
+    ConversationListResponse,
+    ConversationResponse,
+    EntityCreate,
+    EntityListResponse,
+    EntityResponse,
+    EntityUpdate,
+    EventListResponse,
+    EventResponse,
+    ExplanationResponse,
+    ImportJobListResponse,
+    ImportJobResponse,
+    ImportProcessResponse,
+    KnowledgeEdgeCreate,
+    KnowledgeEdgeResponse,
+    KnowledgeExtractRequest,
+    KnowledgeNodeCreate,
+    KnowledgeNodeResponse,
+    KnowledgeStatsResponse,
+    LLMProviderInfo,
+    LLMSettingsResponse,
+    LLMSettingsUpdate,
+    MessageResponse,
+    OCRResponse,
+    OntologyPropertyDef,
+    OntologyTypeDef,
+    RelationshipCreate,
+    RelationshipListResponse,
+    RelationshipResponse,
+    QueryRequest,
+    QueryResponse,
+    StateTransitionRequest,
+    SummarizeRequest,
+    SynthesizeRequest,
+    SystemStatsResponse,
+    TokenResponse,
+    TranscriptionListResponse,
+    TranscriptionResponse,
+    UserLogin,
+    UserRegister,
+    UserResponse,
+    VersionHistoryResponse,
+    VoiceChatResponse,
+)
 from awren_core.services import EventService
 from awren_ingestion.compression import chunk_text, summarize_text
 from awren_ingestion.ocr import is_image_file, ocr_image
@@ -106,6 +172,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
             logger.warning("Ontology seed skipped: %s", e)
         finally:
             session.close()
+        # Seed roles and permissions
+        try:
+            session = create_session()
+            from awren_core.auth import seed_roles_and_permissions
+            seed_roles_and_permissions(session)
+            logger.info("Roles and permissions seeded.")
+        except Exception as e:
+            logger.warning("Role seed skipped: %s", e)
+        finally:
+            session.close()
     except Exception as e:
         logger.warning("Database initialization skipped (not available): %s", e)
     yield
@@ -134,6 +210,26 @@ _MIGRATIONS = [
     "CREATE INDEX IF NOT EXISTS ix_import_jobs_status ON import_jobs(status)",
     # Audio transcriptions table
     "CREATE TABLE IF NOT EXISTS audio_transcriptions (id UUID PRIMARY KEY, original_filename VARCHAR(500) NOT NULL, file_size INTEGER DEFAULT 0, duration_seconds FLOAT DEFAULT 0.0, transcription_text TEXT NOT NULL, language VARCHAR(20) DEFAULT 'unknown', metadata JSONB, created_at TIMESTAMPTZ DEFAULT NOW())",
+    # Users table
+    "CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY, username VARCHAR(100) UNIQUE NOT NULL, email VARCHAR(255) UNIQUE NOT NULL, hashed_password VARCHAR(200) NOT NULL, role VARCHAR(50) DEFAULT 'viewer', is_active BOOLEAN DEFAULT TRUE, api_key_hash VARCHAR(200) UNIQUE, api_key_expires_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())",
+    "CREATE INDEX IF NOT EXISTS ix_users_username ON users(username)",
+    "CREATE INDEX IF NOT EXISTS ix_users_role ON users(role)",
+    # Roles table
+    "CREATE TABLE IF NOT EXISTS roles (id UUID PRIMARY KEY, name VARCHAR(50) UNIQUE NOT NULL, description TEXT, created_at TIMESTAMPTZ DEFAULT NOW())",
+    "CREATE INDEX IF NOT EXISTS ix_roles_name ON roles(name)",
+    # Permissions table
+    "CREATE TABLE IF NOT EXISTS permissions (id UUID PRIMARY KEY, role VARCHAR(50) NOT NULL, resource VARCHAR(100) NOT NULL, action VARCHAR(50) NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())",
+    "CREATE INDEX IF NOT EXISTS ix_permissions_role ON permissions(role)",
+    # Knowledge nodes table
+    "CREATE TABLE IF NOT EXISTS knowledge_nodes (id UUID PRIMARY KEY, kind VARCHAR(50) NOT NULL, label VARCHAR(500) NOT NULL, content TEXT NOT NULL, source VARCHAR(100) DEFAULT 'system', confidence FLOAT DEFAULT 1.0, tags JSONB DEFAULT '[]', metadata JSONB DEFAULT '{}', entity_ids JSONB DEFAULT '[]', created_at TIMESTAMPTZ DEFAULT NOW())",
+    "CREATE INDEX IF NOT EXISTS ix_knowledge_nodes_kind ON knowledge_nodes(kind)",
+    # Knowledge edges table
+    "CREATE TABLE IF NOT EXISTS knowledge_edges (id UUID PRIMARY KEY, source_id UUID NOT NULL, target_id UUID NOT NULL, relationship_type VARCHAR(100) DEFAULT 'derives_from', confidence FLOAT DEFAULT 1.0, metadata JSONB DEFAULT '{}', created_at TIMESTAMPTZ DEFAULT NOW())",
+    "CREATE INDEX IF NOT EXISTS ix_knowledge_edges_source ON knowledge_edges(source_id)",
+    "CREATE INDEX IF NOT EXISTS ix_knowledge_edges_target ON knowledge_edges(target_id)",
+    # Causal chains table
+    "CREATE TABLE IF NOT EXISTS causal_chains (id UUID PRIMARY KEY, head_id UUID NOT NULL, chain JSONB NOT NULL, confidence FLOAT DEFAULT 1.0, source VARCHAR(100) DEFAULT 'system', metadata JSONB DEFAULT '{}', created_at TIMESTAMPTZ DEFAULT NOW())",
+    "CREATE INDEX IF NOT EXISTS ix_causal_chains_head ON causal_chains(head_id)",
 ]
 
 
@@ -186,6 +282,98 @@ def get_event_service(db: Session = Depends(get_db)) -> EventService:
 @app.get("/health", tags=["System"])
 async def health_check() -> dict[str, str]:
     return {"status": "ok", "version": "0.1.0"}
+
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/v1/auth/register", response_model=TokenResponse, tags=["Auth"])
+async def register(
+    payload: UserRegister,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    """Register a new user account."""
+    existing = db.query(UserModel).filter(
+        (UserModel.username == payload.username) | (UserModel.email == payload.email)
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Username or email already exists")
+    user = UserModel(
+        id=uuid4(),
+        username=payload.username,
+        email=payload.email,
+        hashed_password=hash_password(payload.password),
+        role="viewer",
+        is_active=True,
+    )
+    db.add(user)
+    db.flush()
+    token = create_access_token({"sub": str(user.id), "role": user.role})
+    return TokenResponse(
+        access_token=token,
+        user_id=str(user.id),
+        username=user.username,
+        role=user.role,
+    )
+
+
+@app.post("/api/v1/auth/login", response_model=TokenResponse, tags=["Auth"])
+async def login(
+    payload: UserLogin,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    """Authenticate and receive a JWT token."""
+    user = db.query(UserModel).filter(UserModel.username == payload.username).first()
+    if not user or not verify_password(payload.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account is disabled")
+    token = create_access_token({"sub": str(user.id), "role": user.role})
+    return TokenResponse(
+        access_token=token,
+        user_id=str(user.id),
+        username=user.username,
+        role=user.role,
+    )
+
+
+@app.get("/api/v1/auth/me", response_model=UserResponse, tags=["Auth"])
+async def get_me(
+    current_user: UserModel = Depends(get_current_user),
+) -> UserResponse:
+    """Get the currently authenticated user's profile."""
+    return UserResponse(
+        id=str(current_user.id),
+        username=current_user.username,
+        email=current_user.email,
+        role=current_user.role,
+        is_active=current_user.is_active,
+        created_at=current_user.created_at.isoformat() if current_user.created_at else None,
+    )
+
+
+@app.post("/api/v1/auth/api-key", response_model=APIKeyResponse, tags=["Auth"])
+async def generate_api_key(
+    payload: APIKeyGenerateRequest,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> APIKeyResponse:
+    """Generate a new API key for the authenticated user."""
+    import secrets
+    import hashlib
+    from datetime import timedelta
+    api_key = f"awr_{secrets.token_hex(24)}"
+    current_user.api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    if payload.expires_days:
+        current_user.api_key_expires_at = datetime.now(timezone.utc) + timedelta(days=payload.expires_days)
+    db.flush()
+    return APIKeyResponse(
+        api_key=api_key,
+        key_preview=api_key[:12] + "...",
+        expires_at=current_user.api_key_expires_at.isoformat() if current_user.api_key_expires_at else None,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -488,6 +676,18 @@ async def chat(
         model=payload.model,
         temperature=payload.temperature,
     )
+
+    # Build explainability layer
+    explainer = ExplainabilityEngine(svc._session)
+    explanation = await explainer.explain_chat_response(
+        reply=result["reply"],
+        entities_used=result.get("entities_referenced", []),
+        actions_taken=result.get("actions_taken", []),
+        confidence=result["confidence"],
+        model_used=result.get("model", "unknown"),
+        provider=result.get("provider", "unknown"),
+    )
+
     return ChatResponse(
         reply=result["reply"],
         conversation_id=result["conversation_id"],
@@ -497,6 +697,8 @@ async def chat(
         entities_referenced=result["entities_referenced"],
         execution_time_ms=result["execution_time_ms"],
         actions_taken=result.get("actions_taken", []),
+        # Inject explanation into response metadata
+        metadata={"explanation": explanation.to_dict()},
     )
 
 
@@ -537,18 +739,14 @@ async def chat_stream_sse(
     message: str,
     svc: EventService = Depends(get_event_service),
 ):
-    """SSE streaming chat endpoint."""
+    """SSE streaming chat endpoint with explainability."""
     from fastapi.responses import StreamingResponse
 
     async def event_stream():
         conv_id_str, msg_history = await svc.ensure_conversation(conv_id)
-        # Yield conversation_id first so the client can update its URL
         yield f"data: {{\"type\":\"meta\",\"conversation_id\":\"{conv_id_str}\"}}\n\n"
 
-        # Save user message
         await svc._msg_repo.create(UUID(conv_id_str), "user", message)
-
-        # Build system prompt with history
         system_prompt = svc._build_system_prompt(message, msg_history)
         llm = create_llm_client(db_session=svc._session)
         if llm:
@@ -565,7 +763,6 @@ async def chat_stream_sse(
             except Exception as e:
                 yield f"data: {{\"type\":\"error\",\"content\":{_json.dumps(str(e))}}}\n\n"
             else:
-                # Parse and execute actions
                 clean_reply, actions = await svc._parse_actions(full_reply)
                 action_results = []
                 if actions:
@@ -576,17 +773,26 @@ async def chat_stream_sse(
                     if success_msgs:
                         clean_reply += "\n\n" + "\n".join(success_msgs)
 
-                # Save assistant message
                 await svc._msg_repo.create(
                     UUID(conv_id_str), "assistant", clean_reply,
                     metadata={"actions": action_results} if action_results else None,
                 )
 
-                # Auto-title
                 if len(msg_history) <= 1:
                     title = message[:80] + ("..." if len(message) > 80 else "")
                     await svc._conv_repo.update_title(UUID(conv_id_str), title)
 
+                # Build explainability layer
+                explainer = ExplainabilityEngine(svc._session)
+                explanation = await explainer.explain_chat_response(
+                    reply=clean_reply,
+                    actions_taken=action_results,
+                    confidence=0.85 if llm else 0.0,
+                    model_used=getattr(llm, "model", "unknown"),
+                    provider=getattr(llm, "model", "unknown"),
+                )
+
+                yield f"data: {{\"type\":\"explanation\",\"content\":{_json.dumps(explanation.to_dict())}}}\n\n"
                 yield f"data: {{\"type\":\"done\",\"actions\":{_json.dumps(action_results)}}}\n\n"
         else:
             yield "data: {\"type\":\"error\",\"content\":\"No LLM configured\"}\n\n"
@@ -977,7 +1183,7 @@ def _import_job_to_response(job: ImportJobModel) -> ImportJobResponse:
 @app.get("/api/v1/system/stats", tags=["System"])
 async def system_stats(
     db: Session = Depends(get_db),
-) -> SystemStatsResponse:
+) -> dict[str, Any]:
     """Get comprehensive system statistics for monitoring dashboard.
     
     Returns counts of entities, relationships, events, conversations, imports;
@@ -1037,6 +1243,26 @@ async def system_stats(
     start_time = _uptime_start.get("time", _time.time())
     uptime_hours = (_time.time() - start_time) / 3600
 
+    # Knowledge graph layer stats
+    total_knowledge_nodes = db.execute(
+        select(func.count(KnowledgeNodeModel.id))
+    ).scalar() or 0
+    knowledge_by_kind = db.execute(
+        select(KnowledgeNodeModel.kind, func.count(KnowledgeNodeModel.id).label("count"))
+        .group_by(KnowledgeNodeModel.kind)
+    ).all()
+    knowledge_by_kind_dict = {row[0]: row[1] for row in knowledge_by_kind}
+
+    # Causal chains count
+    total_causal_chains = db.execute(
+        select(func.count(CausalChainModel.id))
+    ).scalar() or 0
+
+    # User counts
+    total_users = db.execute(
+        select(func.count(UserModel.id))
+    ).scalar() or 0
+
     return SystemStatsResponse(
         total_entities=total_entities,
         total_relationships=total_relationships,
@@ -1050,6 +1276,11 @@ async def system_stats(
         llm_provider=llm_settings.get("provider", "unknown"),
         llm_model=llm_settings.get("model", "unknown"),
         uptime_hours=round(uptime_hours, 2),
+        # New fields for new layers
+        total_users=total_users,
+        total_knowledge_nodes=total_knowledge_nodes,
+        knowledge_by_kind=knowledge_by_kind_dict,
+        total_causal_chains=total_causal_chains,
     )
 
 
@@ -1064,6 +1295,250 @@ async def _get_llm_settings(db: Session) -> dict:
         return await repo.get()
     except Exception:
         return {}
+
+
+# ---------------------------------------------------------------------------
+# Knowledge Graph Layer — Insights, Rules, Patterns
+# ---------------------------------------------------------------------------
+
+
+def _get_knowledge_engine(db: Session = Depends(get_db)) -> KnowledgeEngine:
+    return KnowledgeEngine(db)
+
+
+@app.post("/api/v1/knowledge/nodes", tags=["Knowledge"])
+async def create_knowledge_node(
+    payload: KnowledgeNodeCreate,
+    engine: KnowledgeEngine = Depends(_get_knowledge_engine),
+) -> KnowledgeNodeResponse:
+    """Create a knowledge node (insight, rule, or pattern)."""
+    node = await engine.create_node(
+        kind=payload.kind,
+        label=payload.label,
+        content=payload.content,
+        source=payload.source,
+        confidence=payload.confidence,
+        tags=payload.tags,
+        metadata=payload.metadata,
+        entity_ids=[UUID(eid) for eid in payload.entity_ids],
+    )
+    return KnowledgeNodeResponse(**node)
+
+
+@app.get("/api/v1/knowledge/nodes", tags=["Knowledge"])
+async def list_knowledge_nodes(
+    kind: Optional[str] = Query(None, description="Filter by kind: insight, rule, pattern"),
+    source: Optional[str] = Query(None),
+    tag: Optional[str] = Query(None),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    engine: KnowledgeEngine = Depends(_get_knowledge_engine),
+) -> dict[str, Any]:
+    """List knowledge nodes with optional filters."""
+    nodes = await engine.list_nodes(kind=kind, source=source, tag=tag, limit=limit, offset=offset)
+    total = await engine.count_nodes(kind=kind)
+    return {"nodes": [KnowledgeNodeResponse(**n) for n in nodes], "total": total}
+
+
+@app.get("/api/v1/knowledge/nodes/{node_id}", tags=["Knowledge"])
+async def get_knowledge_node(
+    node_id: UUID,
+    engine: KnowledgeEngine = Depends(_get_knowledge_engine),
+) -> KnowledgeNodeResponse:
+    """Get a specific knowledge node by ID."""
+    node = await engine.get_node(node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Knowledge node not found")
+    return KnowledgeNodeResponse(**node)
+
+
+@app.delete("/api/v1/knowledge/nodes/{node_id}", tags=["Knowledge"])
+async def delete_knowledge_node(
+    node_id: UUID,
+    engine: KnowledgeEngine = Depends(_get_knowledge_engine),
+) -> dict[str, str]:
+    """Delete a knowledge node."""
+    deleted = await engine.delete_node(node_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Knowledge node not found")
+    return {"status": "deleted"}
+
+
+@app.post("/api/v1/knowledge/edges", tags=["Knowledge"])
+async def create_knowledge_edge(
+    payload: KnowledgeEdgeCreate,
+    engine: KnowledgeEngine = Depends(_get_knowledge_engine),
+) -> KnowledgeEdgeResponse:
+    """Create a connection between two knowledge nodes or to entities."""
+    edge = await engine.create_edge(
+        source_id=UUID(payload.source_id),
+        target_id=UUID(payload.target_id),
+        relationship_type=payload.relationship_type,
+        confidence=payload.confidence,
+        metadata=payload.metadata,
+    )
+    return KnowledgeEdgeResponse(**edge)
+
+
+@app.get("/api/v1/knowledge/nodes/{node_id}/edges", tags=["Knowledge"])
+async def get_knowledge_edges(
+    node_id: UUID,
+    engine: KnowledgeEngine = Depends(_get_knowledge_engine),
+) -> list[KnowledgeEdgeResponse]:
+    """Get all edges connected to a knowledge node."""
+    edges = await engine.get_edges_for_node(node_id)
+    return [KnowledgeEdgeResponse(**e) for e in edges]
+
+
+@app.post("/api/v1/knowledge/extract", tags=["Knowledge"])
+async def extract_knowledge(
+    payload: KnowledgeExtractRequest,
+    engine: KnowledgeEngine = Depends(_get_knowledge_engine),
+) -> dict[str, Any]:
+    """Extract insights, rules, and patterns from text using LLM."""
+    nodes = await engine.extract_insights_from_text(
+        text=payload.text,
+        source=payload.source,
+    )
+    return {
+        "extracted": len(nodes),
+        "nodes": [KnowledgeNodeResponse(**n) for n in nodes],
+    }
+
+
+@app.get("/api/v1/knowledge/stats", tags=["Knowledge"])
+async def knowledge_stats(
+    engine: KnowledgeEngine = Depends(_get_knowledge_engine),
+) -> KnowledgeStatsResponse:
+    """Get statistics about the knowledge graph layer."""
+    stats = await engine.get_stats()
+    return KnowledgeStatsResponse(**stats)
+
+
+@app.post("/api/v1/knowledge/query", tags=["Knowledge"])
+async def knowledge_query(
+    query: str,
+    kind: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    engine: KnowledgeEngine = Depends(_get_knowledge_engine),
+) -> dict[str, Any]:
+    """Query knowledge nodes by content relevance."""
+    kinds = [kind] if kind else None
+    nodes = await engine.query_knowledge(query=query, kinds=kinds, limit=limit)
+    return {
+        "query": query,
+        "results": [KnowledgeNodeResponse(**n) for n in nodes],
+        "total": len(nodes),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Causal Reasoning — Multi-hop Causal Chains
+# ---------------------------------------------------------------------------
+
+
+def _get_causal_engine(db: Session = Depends(get_db)) -> CausalEngine:
+    return CausalEngine(db)
+
+
+@app.post("/api/v1/causal/forward", tags=["Causal"])
+async def causal_forward_chain(
+    payload: CausalAnalysisRequest,
+    engine: CausalEngine = Depends(_get_causal_engine),
+) -> dict[str, Any]:
+    """Forward causal chaining — what does this entity cause?
+
+    Traverses 'causes', 'enables', 'triggers', 'leads_to' relationships.
+    """
+    entity_id = UUID(payload.entity_id)
+    chains = await engine.forward_chain(
+        entity_id=entity_id,
+        max_hops=payload.max_hops,
+        min_confidence=payload.min_confidence,
+    )
+    return {
+        "entity_id": payload.entity_id,
+        "method": "forward_chain",
+        "chains": chains,
+        "total": len(chains),
+    }
+
+
+@app.post("/api/v1/causal/backward", tags=["Causal"])
+async def causal_backward_chain(
+    payload: CausalAnalysisRequest,
+    engine: CausalEngine = Depends(_get_causal_engine),
+) -> dict[str, Any]:
+    """Backward causal chaining — what causes this entity?
+
+    Traces root causes by following reverse causal relationships.
+    """
+    entity_id = UUID(payload.entity_id)
+    chains = await engine.backward_chain(
+        entity_id=entity_id,
+        max_hops=payload.max_hops,
+        min_confidence=payload.min_confidence,
+    )
+    return {
+        "entity_id": payload.entity_id,
+        "method": "backward_chain",
+        "chains": chains,
+        "total": len(chains),
+    }
+
+
+@app.post("/api/v1/causal/analyze", tags=["Causal"])
+async def causal_llm_analysis(
+    payload: CausalAnalysisRequest,
+    engine: CausalEngine = Depends(_get_causal_engine),
+) -> dict[str, Any]:
+    """LLM-powered causal analysis — infer causal relationships from entity data.
+
+    Uses the LLM to suggest causal chains not explicitly stored in the graph.
+    """
+    entity_id = UUID(payload.entity_id)
+    chains = await engine.llm_causal_analysis(
+        entity_id=entity_id,
+        max_chains=payload.max_hops,
+    )
+    return {
+        "entity_id": payload.entity_id,
+        "method": "llm_analysis",
+        "chains": chains,
+        "total": len(chains),
+    }
+
+
+@app.post("/api/v1/causal/paths", tags=["Causal"])
+async def causal_find_paths(
+    payload: CausalPathRequest,
+    engine: CausalEngine = Depends(_get_causal_engine),
+) -> dict[str, Any]:
+    """Find causal paths between two entities using graph traversal."""
+    paths = await engine.find_paths(
+        source_id=UUID(payload.source_id),
+        target_id=UUID(payload.target_id),
+        max_hops=payload.max_hops,
+    )
+    return {
+        "source_id": payload.source_id,
+        "target_id": payload.target_id,
+        "paths": paths,
+        "total": len(paths),
+    }
+
+
+@app.get("/api/v1/causal/chains", tags=["Causal"])
+async def list_causal_chains(
+    entity_id: Optional[str] = Query(None, description="Filter chains involving this entity"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    engine: CausalEngine = Depends(_get_causal_engine),
+) -> dict[str, Any]:
+    """List recorded causal chains."""
+    eid = UUID(entity_id) if entity_id else None
+    chains = await engine.list_chains(entity_id=eid, limit=limit, offset=offset)
+    return {"chains": chains, "total": len(chains)}
 
 
 # ---------------------------------------------------------------------------

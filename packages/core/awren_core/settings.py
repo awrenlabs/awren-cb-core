@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     """Vector dimensions for the embedding model.
     text-embedding-3-small = 1536, text-embedding-3-large = 3072, ada-002 = 1536.
     """
+    jwt_secret: str = ""
+    """JWT signing secret for authentication tokens. Auto-generated if empty."""
     log_level: str = "INFO"
     environment: str = "development"
 

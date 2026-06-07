@@ -249,3 +249,110 @@ class AudioTranscriptionModel(Base):
 
     def __repr__(self) -> str:
         return f"<AudioTranscriptionModel id={self.id} file={self.original_filename}>"
+
+
+class UserModel(Base):
+    """System user with role-based access control."""
+
+    __tablename__ = "users"
+
+    id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True, default=uuid4)
+    username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(200), nullable=False)
+    role: Mapped[str] = mapped_column(String(50), default="viewer", index=True)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    api_key_hash: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, unique=True)
+    api_key_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    def __repr__(self) -> str:
+        return f"<UserModel id={self.id} username={self.username} role={self.role}>"
+
+
+class RoleModel(Base):
+    """System role definition."""
+
+    __tablename__ = "roles"
+
+    id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self) -> str:
+        return f"<RoleModel name={self.name}>"
+
+
+class PermissionModel(Base):
+    """Granular permission linking a role to a resource+action."""
+
+    __tablename__ = "permissions"
+
+    id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True, default=uuid4)
+    role: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    resource: Mapped[str] = mapped_column(String(100), nullable=False)
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self) -> str:
+        return f"<PermissionModel role={self.role} {self.action}:{self.resource}>"
+
+
+class KnowledgeNodeModel(Base):
+    """Knowledge graph layer — insights, rules, and patterns.
+
+    Beyond the base ontology, this captures higher-order knowledge
+    derived from analysis, LLM extraction, or manual input.
+    """
+
+    __tablename__ = "knowledge_nodes"
+
+    id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True, default=uuid4)
+    kind: Mapped[str] = mapped_column(String(50), nullable=False, index=True)  # insight, rule, pattern
+    label: Mapped[str] = mapped_column(String(500), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str] = mapped_column(String(100), default="system")
+    confidence: Mapped[float] = mapped_column(default=1.0)
+    tags: Mapped[Optional[list[str]]] = mapped_column(JSON, default=list)
+    metadata_: Mapped[Optional[dict[str, Any]]] = mapped_column("metadata", JSON, default=dict)
+    entity_ids: Mapped[Optional[list[str]]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self) -> str:
+        return f"<KnowledgeNodeModel id={self.id} kind={self.kind} label={self.label}>"
+
+
+class KnowledgeEdgeModel(Base):
+    """Connections between knowledge nodes and/or ontology entities."""
+
+    __tablename__ = "knowledge_edges"
+
+    id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True, default=uuid4)
+    source_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False, index=True)
+    target_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False, index=True)
+    relationship_type: Mapped[str] = mapped_column(String(100), default="derives_from")
+    confidence: Mapped[float] = mapped_column(default=1.0)
+    metadata_: Mapped[Optional[dict[str, Any]]] = mapped_column("metadata", JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self) -> str:
+        return f"<KnowledgeEdgeModel source={self.source_id} -> {self.target_id}>"
+
+
+class CausalChainModel(Base):
+    """Discovered causal chains — ordered sequences of cause-effect relationships."""
+
+    __tablename__ = "causal_chains"
+
+    id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True, default=uuid4)
+    head_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False, index=True)
+    chain: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False)
+    confidence: Mapped[float] = mapped_column(default=1.0)
+    source: Mapped[str] = mapped_column(String(100), default="system")
+    metadata_: Mapped[Optional[dict[str, Any]]] = mapped_column("metadata", JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self) -> str:
+        return f"<CausalChainModel id={self.id} head={self.head_id} hops={len(self.chain) if self.chain else 0}>"

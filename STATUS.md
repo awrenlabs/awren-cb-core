@@ -1,8 +1,8 @@
 # Awren Core — Status Report
 
-> **Versão:** 0.4.0
+> **Versão:** 0.5.0
 > **Data:** 2026-06-06
-> **Progresso:** 🟢 Ontologia enterprise com type registry + state machine + version history | 🟢 Ingestão de documentos (PDF/DOCX/CSV/JSON/TXT/MD) com extração LLM | 🟢 Audio API (STT + TTS + voice chat) | 🟢 OCR (imagens + PDF escaneado) | 🟢 Chat streaming com Brain | 🟢 Compressão de informação (chunk/summarize/dedup) | 🟢 Dashboard com chat, grafo, streaming, settings | 🟢 40 endpoints API com OpenAPI docs | 🟢 Monitoramento do sistema
+> **Progresso:** 🟢 Ontologia enterprise | 🟢 Ingestão de documentos | 🟢 Audio/OCR/Compressão | 🟢 Chat streaming | 🟢 **🔐 Autenticação JWT + API Key** | 🟢 **🔑 RBAC (roles/permissions)** | 🟢 **🧠 Knowledge Graph Layer (insights/rules/patterns)** | 🟢 **🔗 Causal Reasoning (forward/backward/LLM chains)** | 🟢 **💡 Explainability Layer (what/why/data/confidence)** | 🟢 **⚡ Background processing (Celery)** | 🟢 Dashboard completo | 🟢 55+ endpoints API
 
 ---
 
@@ -200,14 +200,10 @@ O projeto evoluiu de uma fundação sólida para um **sistema cognitivo empresar
 
 | Lacuna | Impacto |
 |---|---|
-| **Sem auth/rate-limit** | API pública — inviável para produção |
-| **Sem background processing** | Ingestão síncrona — trava request em arquivos grandes |
-| **Sem RBAC / permissões** | Qualquer usuário vê/altera tudo |
-| **Sem Knowledge Graph Layer** | Insights, regras e padrões aprendidos não são persistidos separadamente |
-| **Sem Reasoning Layer (causal chains)** | Não há encadeamento multi-hop (Projeto Atrasado → Fornecedor Falhou) |
-| **Sem Explainability Layer** | Respostas do Brain não explicam "o quê, por quê, quais dados, confiança" |
 | **Sem contagem real de vectores Qdrant** | Dashboard não mostra estatísticas de memória vetorial |
-| **Dashboard não tem páginas de monitoring/audio/imports** | Stats via API apenas |
+| **Dashboard não tem páginas de monitoring/knowledge/audio/imports** | Stats via API apenas |
+| **Sem rate-limiting na API** | Sem proteção contra abuso |
+| **Sem testes end-to-end com docker-compose** | PostgreSQL + Neo4j + Qdrant não validados juntos |
 | **Domínio Construction Brain apenas esboçado** | ontology.py com 3 classes |
 
 ---
@@ -216,28 +212,36 @@ O projeto evoluiu de uma fundação sólida para um **sistema cognitivo empresar
 
 | Métrica | Valor |
 |---------|-------|
-| Endpoints API | **40** (health, entities, relationships, events, query, chat, streaming, ontology CRUD, ingestion, audio, OCR, compression, system stats, settings) |
+| Endpoints API | **55+** (health, auth, entities, relationships, events, query, chat, streaming, ontology CRUD, ingestion, audio, OCR, compression, knowledge nodes/edges, causal chains, system stats, settings) |
 | Dashboard pages | 9 (Overview, Entities, Entity Detail, Events, Graph, Relationships, Chat, Research Agent, Settings) |
 | Packages | 8 pacotes instaláveis via Poetry |
 | Comandos CLI | 10+ comandos |
 | ADRs | 10 (decisões arquiteturais documentadas) |
 | RFCs | 10 (especificações técnicas) |
 | Research papers | 7 |
+| Users seeded | admin (role: admin), roles: admin/operator/viewer/ingest |
+| Knowledge nodes | insights, rules, patterns with LLM extraction |
+| Causal chains | forward/backward traversal + LLM analysis + path finding |
 
 ---
 
-## 💼 Viabilidade Comercial: Alpha Funcional
+## 💼 Viabilidade Comercial: Beta Controlado
 
-O projeto está na **fase R1.5 — Alpha Funcional**. Já é demonstrável como prova de conceito integrada.
+O projeto está na **fase R2 — Beta Controlado**. Pronto para deploy interno com auth.
 
 **O que IMPEDE o uso comercial:**
-1. **Sem autenticação/segurança** — API pública
-2. **Sem background processing** — Uploads síncronos
-3. **Sem RBAC** — Sem isolamento multi-tenant
-4. **Sem testes end-to-end com docker-compose real** (PostgreSQL + Neo4j + Qdrant)
+1. **Sem rate-limiting** — Sem proteção contra abuso
+2. **Sem testes end-to-end com docker-compose real** (PostgreSQL + Neo4j + Qdrant)
+3. **Dashboard knowledge/causal pages** — Acesso apenas via API
 
 **O que JÁ é comercializável (como internal tool / POC):**
-- ✅ API REST completa com 40 endpoints
+- ✅ **Autenticação JWT + API Key** — login, registro, tokens
+- ✅ **RBAC** — 4 roles (admin, operator, viewer, ingest) com permissions granulares
+- ✅ API REST completa com 55+ endpoints
+- ✅ **Knowledge Graph Layer** — insights, regras, padrões extraídos via LLM
+- ✅ **Causal Reasoning** — forward/backward chains, LLM analysis, path finding
+- ✅ **Explainability** — toda resposta do chat explica what/why/data/confidence/assumptions
+- ✅ **Background processing** — Celery configurado (requer Redis)
 - ✅ Chat com IA sobre dados do conhecimento corporativo
 - ✅ Ingestão de documentos com extração automática
 - ✅ Grafo de conhecimento interativo
@@ -251,14 +255,11 @@ O projeto está na **fase R1.5 — Alpha Funcional**. Já é demonstrável como 
 
 | Prioridade | O que | Status |
 |---|---|---|
-| **1** | 🔐 **Autenticação** (API Key ou JWT) | ❌ Pendente |
-| **2** | ⚡ **Background processing** (Celery/Redis) | ❌ Pendente |
-| **3** | 🧪 **Teste end-to-end com docker-compose** | ❌ Pendente |
-| **4** | 🗃️ **Seed data + Qdrant vector count** | ❌ Pendente |
-| **5** | 📊 **Dashboard monitoring/audio/imports pages** | ❌ Pendente |
-| **6** | 🔗 **Knowledge Graph Layer** (insights + regras) | ❌ Pendente |
-| **7** | 🧩 **Reasoning Layer** (causal chains) | ❌ Pendente |
-| **8** | 💡 **Explainability Layer** (toda resposta explica por quê) | ❌ Pendente |
+| **1** | 🧪 **Teste end-to-end com docker-compose** (PostgreSQL + Neo4j + Qdrant + Redis) | ❌ Pendente |
+| **2** | 🗃️ **Seed data + Qdrant vector count no dashboard** | ❌ Pendente |
+| **3** | 📊 **Dashboard knowledge/causal/monitoring/audio/imports pages** | ❌ Pendente |
+| **4** | 🔐 **Rate limiting na API** | ❌ Pendente |
+| **5** | 🚀 **Deploy em produção** (Easypanel / Railway) | ❌ Pendente |
 
 ---
 
